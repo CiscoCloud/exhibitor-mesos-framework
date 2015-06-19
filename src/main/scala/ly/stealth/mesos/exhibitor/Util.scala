@@ -181,4 +181,18 @@ object Util {
     }
   }
 
+  def getScalarResources(offer: Offer, name: String): Double = {
+    offer.getResourcesList.foldLeft(0.0) { (all, current) =>
+      if (current.getName == name) all + current.getScalar.getValue
+      else all
+    }
+  }
+
+  def getRangeResources(offer: Offer, name: String): List[Protos.Value.Range] = {
+    offer.getResourcesList.foldLeft[List[Protos.Value.Range]](List()) { case (all, current) =>
+      if (current.getName == name) all ++ current.getRanges.getRangeList
+      else all
+    }
+  }
+
 }
