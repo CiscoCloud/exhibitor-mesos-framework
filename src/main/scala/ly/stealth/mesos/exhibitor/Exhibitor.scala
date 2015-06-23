@@ -19,7 +19,7 @@
 package ly.stealth.mesos.exhibitor
 
 import java.io.File
-import java.net.{URL, URLClassLoader}
+import java.net.URLClassLoader
 import java.util
 
 import org.apache.log4j.Logger
@@ -63,13 +63,10 @@ object Exhibitor {
   private lazy val loader = init
 
   private def init: ClassLoader = {
-    val file = "exhibitor-standalone.jar" //TODO replace with find distribution
-
-    val classpath = new util.ArrayList[URL]()
-    classpath.add(new URL("" + new File(file).toURI))
-
-    val loader = URLClassLoader.newInstance(classpath.toArray(Array()), getClass.getClassLoader)
-    loader
+    new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask)) match {
+      case None => throw new IllegalStateException("Exhibitor standalone jar not found")
+      case Some(exhibitorDist) => URLClassLoader.newInstance(Array(exhibitorDist.toURI.toURL), getClass.getClassLoader)
+    }
   }
 
   def newServer(props: util.Map[String, String]): AnyRef = {

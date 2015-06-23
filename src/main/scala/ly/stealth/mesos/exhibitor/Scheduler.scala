@@ -64,7 +64,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   def main(args: Array[String]) {
     schedulerConfig = parseSchedulerConfig(args)
 
-    val server = new HttpServer(schedulerConfig)
+    HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(schedulerConfig.user)
@@ -79,7 +79,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     })
 
     val status = if (driver.run eq Status.DRIVER_STOPPED) 0 else 1
-    server.stop()
+    HttpServer.stop()
     sys.exit(status)
   }
 
@@ -183,11 +183,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def newExecutor(id: String): ExecutorInfo = {
     val commandBuilder = CommandInfo.newBuilder()
     commandBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/resource/exhibitor-standalone.jar"))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/resource/exhibitor-mesos-0.1.jar"))
-      .setValue(s"java -cp exhibitor-mesos-0.1.jar ly.stealth.mesos.exhibitor.Executor")
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/exhibitor/" + HttpServer.exhibitorDist.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/jar/" + HttpServer.jar.getName))
+      .setValue(s"java -cp ${HttpServer.jar.getName} ly.stealth.mesos.exhibitor.Executor")
 
-    ExecutorInfo.newBuilder().setExecutorId(ExecutorID.newBuilder().setValue(id))
+    ExecutorInfo.newBuilder()
+      .setExecutorId(ExecutorID.newBuilder().setValue(id))
       .setCommand(commandBuilder)
       .setName(s"exhibitor-$id")
       .build

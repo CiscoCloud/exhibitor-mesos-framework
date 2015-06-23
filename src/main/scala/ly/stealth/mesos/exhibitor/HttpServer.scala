@@ -21,42 +21,87 @@ package ly.stealth.mesos.exhibitor
 import java.io._
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
+import org.apache.log4j.Logger
 import org.eclipse.jetty.server.{Server, ServerConnector}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 
-class HttpServer(config: SchedulerConfig) {
-  val threadPool = new QueuedThreadPool(16)
-  threadPool.setName("Jetty")
+import scala.util.{Failure, Success, Try}
 
-  val server = new Server(threadPool)
-  val connector = new ServerConnector(server)
-  connector.setPort(config.httpServerPort)
+object HttpServer {
+  private val logger = Logger.getLogger(HttpServer.getClass)
+  private var server: Server = null
 
-  val handler = new ServletContextHandler
-  handler.addServlet(new ServletHolder(new Servlet()), "/")
+  val jarMask = "mesos-exhibitor.*\\.jar"
+  val exhibitorMask = "exhibitor.*\\.jar"
 
-  server.setHandler(handler)
-  server.addConnector(connector)
-  server.start()
+  private[exhibitor] var jar: File = null
+  private[exhibitor] var exhibitorDist: File = null
+
+  def start(resolveDeps: Boolean = true) {
+    if (server != null) throw new IllegalStateException("HttpServer already started")
+    if (resolveDeps) this.resolveDeps()
+
+    val threadPool = new QueuedThreadPool(16)
+    threadPool.setName("Jetty")
+
+    server = new Server(threadPool)
+    val connector = new ServerConnector(server)
+    connector.setPort(Config.httpServerPort)
+    connector.setIdleTimeout(60 * 1000)
+
+    val handler = new ServletContextHandler
+    handler.addServlet(new ServletHolder(new Servlet()), "/")
+
+    server.setHandler(handler)
+    server.addConnector(connector)
+    server.start()
+
+    logger.info("started on port " + connector.getPort)
+  }
 
   def stop() {
-    if (server == null) throw new IllegalStateException("!started")
+    if (server == null) throw new IllegalStateException("HttpServer not started")
 
     server.stop()
     server.join()
+    server = null
+
+    logger.info("HttpServer stopped")
+  }
+
+  private def resolveDeps() {
+    for (file <- new File(".").listFiles()) {
+      if (file.getName.matches(jarMask)) jar = file
+      if (file.getName.matches(exhibitorMask)) exhibitorDist = file
+    }
+
+    if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
+    if (exhibitorDist == null) throw new IllegalStateException(exhibitorMask + " not found in in current dir")
   }
 
   class Servlet extends HttpServlet {
-    override def doGet(request: HttpServletRequest, response: HttpServletResponse): Unit = {
+    override def doGet(request: HttpServletRequest, response: HttpServletResponse) {
+      Try(handle(request, response)) match {
+        case Success(_) =>
+        case Failure(e) =>
+          logger.warn("", e)
+          response.sendError(500, "" + e)
+          throw e
+      }
+    }
+
+    def handle(request: HttpServletRequest, response: HttpServletResponse) {
       val uri = request.getRequestURI
-      if (uri.startsWith("/resource/")) downloadFile(uri.split("/").last, response)
+      if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
+      else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
       else response.sendError(404)
     }
 
-    def downloadFile(file: String, response: HttpServletResponse) {
+    def downloadFile(file: File, response: HttpServletResponse) {
       response.setContentType("application/zip")
-      response.setHeader("Content-Disposition", "attachment; filename=\"" + new File(file).getName + "\"")
+      response.setHeader("Content-Length", "" + file.length())
+      response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
       Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
     }
   }
