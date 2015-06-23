@@ -2,6 +2,7 @@ package ly.stealth.mesos.exhibitor
 
 import java.util
 
+import com.google.protobuf.ByteString
 import ly.stealth.mesos.exhibitor.Util.Str
 import org.apache.log4j.Logger
 import org.apache.mesos.Protos._
@@ -132,6 +133,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val hostsToStart = schedulerConfig.hosts.filter(host => !runningHosts.contains(host)).toSet
 
+    //TODO don't use hosts to start - should not depend on specific nodes but rather start a new Zookeeper instance on an offered node
     offers.foreach { offer =>
       hostsToStart.find(_ == offer.getHostname) match {
         case Some(host) =>
@@ -166,7 +168,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       val id = s"exhibitor-$host-${portOpt.get}"
       val taskId = TaskID.newBuilder().setValue(id).build
       val taskInfo = TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-        .setExecutor(this.createExecutor(id, portOpt.get))
+        .setExecutor(this.newExecutor(id))
+        .setData(taskData(portOpt.get))
         .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(schedulerConfig.cpuPerTask)))
         .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(schedulerConfig.memPerTask)))
         .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
@@ -177,7 +180,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
     } else None
   }
 
-  private def createExecutor(id: String, port: Long): ExecutorInfo = {
-    ???
+  private def newExecutor(id: String): ExecutorInfo = {
+    val commandBuilder = CommandInfo.newBuilder()
+    commandBuilder
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/resource/exhibitor-standalone.jar"))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"http://${schedulerConfig.httpServerHost}:${schedulerConfig.httpServerPort}/resource/exhibitor-mesos-0.1.jar"))
+      .setValue(s"java -cp exhibitor-mesos-0.1.jar ly.stealth.mesos.exhibitor.Executor")
+
+    ExecutorInfo.newBuilder().setExecutorId(ExecutorID.newBuilder().setValue(id))
+      .setCommand(commandBuilder)
+      .setName(s"exhibitor-$id")
+      .build
+  }
+
+  private def taskData(port: Long): ByteString = {
+    ByteString.copyFromUtf8(s"configtype=file,port=$port") //TODO this should come from outside
   }
 }

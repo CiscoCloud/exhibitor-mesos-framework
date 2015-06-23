@@ -2,6 +2,8 @@ apply plugin: 'scala'
 
 version = '0.1'
 
+sourceCompatibility = '1.7'
+
 jar.archiveName = "exhibitor-mesos-${version}.jar"
 
 repositories {
