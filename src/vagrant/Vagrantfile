@@ -15,7 +15,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-SLAVES=1
+SLAVES=2
 NET_PREFIX="192.168.3."
 
 NODES={"master" => NET_PREFIX + "5"}
@@ -40,6 +40,7 @@ Vagrant.configure(2) do |config|
     master.vm.hostname = "master"
     master.vm.network :private_network, ip: NODES["master"]
 
+    master.vm.provision :shell, inline: 'wget --no-check-certificate https://github.com/aglover/ubuntu-equip/raw/master/equip_java8.sh && bash equip_java8.sh'
     master.vm.provision "shell", path: "init.sh", args: "master"
   end
 
@@ -53,6 +54,7 @@ Vagrant.configure(2) do |config|
       slave.vm.hostname = "slave#{i}"
       slave.vm.network :private_network, ip: NODES[slave.vm.hostname]
 
+      slave.vm.provision :shell, inline: 'wget --no-check-certificate https://github.com/aglover/ubuntu-equip/raw/master/equip_java8.sh && bash equip_java8.sh'
       slave.vm.provision "shell", path: "init.sh", args: "slave"
     end
   end

@@ -95,6 +95,7 @@ object HttpServer {
       val uri = request.getRequestURI
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
+      else if (uri.startsWith("/api")) handleApi(request, response)
       else response.sendError(404)
     }
 
@@ -103,6 +104,27 @@ object HttpServer {
       response.setHeader("Content-Length", "" + file.length())
       response.setHeader("Content-Disposition", "attachment; filename=\"" + file.getName + "\"")
       Util.copyAndClose(new FileInputStream(file), response.getOutputStream)
+    }
+
+    def handleApi(request: HttpServletRequest, response: HttpServletResponse) {
+      response.setContentType("application/json; charset=utf-8")
+      var uri: String = request.getRequestURI.substring("/api".length)
+      if (uri.startsWith("/")) uri = uri.substring(1)
+
+      if (uri == "add") handleAddServer(request, response)
+      else response.sendError(404)
+    }
+
+    private def handleAddServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val id = request.getParameter("id")
+      val cpus = Option(request.getParameter("cpu"))
+      val mem = Option(request.getParameter("mem"))
+
+      val server = ExhibitorServer(id)
+      cpus.foreach(cpus => server.cpus = cpus.toDouble)
+      mem.foreach(mem => server.mem = mem.toDouble)
+
+      Scheduler.cluster.servers += server
     }
   }
 

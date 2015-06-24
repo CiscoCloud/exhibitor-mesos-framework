@@ -88,7 +88,7 @@ echo "deb http://get.docker.com/ubuntu docker main" > /etc/apt/sources.list.d/do
 apt-get -qy update
 
 # install deps
-apt-get install -qy vim zip mc curl wget openjdk-7-jre scala git
+apt-get install -qy vim zip mc curl wget scala git
 
 install_mesos $mode
 if [ $mode == "master" ]; then install_marathon; fi

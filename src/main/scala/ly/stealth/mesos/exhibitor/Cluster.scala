@@ -18,16 +18,12 @@
 
 package ly.stealth.mesos.exhibitor
 
-import java.net.URI
+import scala.collection.mutable.ListBuffer
 
-object Config {
-  var master: String = null
-  var user: String = null
+case class Cluster() {
+  private[exhibitor] val servers = new ListBuffer[ExhibitorServer]
 
-  var api: String = null
+  def getServer(id: String): Option[ExhibitorServer] = servers.find(_.id == id)
 
-  def httpServerPort: Int = {
-    val port = new URI(api).getPort
-    if (port == -1) 80 else port
-  }
+  override def toString: String = servers.toString()
 }
