@@ -2,9 +2,8 @@ package ly.stealth.mesos.exhibitor
 
 import java.util
 
-import com.google.protobuf.ByteString
 import ly.stealth.mesos.exhibitor.Util.Str
-import org.apache.log4j.Logger
+import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 
@@ -16,6 +15,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private[exhibitor] val cluster = Cluster()
 
   def start() {
+    initLogging()
     logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 
     HttpServer.start()
@@ -127,11 +127,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
+    val cmd = s"java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
+
     val commandBuilder = CommandInfo.newBuilder()
     commandBuilder
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/exhibitor/" + HttpServer.exhibitorDist.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/zookeeper/" + HttpServer.zookeeperDist.getName).setExtract(true))
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
-      .setValue(s"java -cp ${HttpServer.jar.getName} ly.stealth.mesos.exhibitor.Executor")
+      .setValue(cmd)
 
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder().setValue(id))
@@ -140,7 +143,78 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build
   }
 
-  private[exhibitor] def taskData(port: Long): ByteString = {
-    ByteString.copyFromUtf8(s"configtype=file,port=$port") //TODO this should come from outside
+  private def initLogging() {
+    System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
+
+    BasicConfigurator.resetConfiguration()
+
+    val root = Logger.getRootLogger
+    root.setLevel(Level.INFO)
+
+    Logger.getLogger("org.apache.zookeeper").setLevel(Level.WARN)
+    Logger.getLogger("org.I0Itec.zkclient").setLevel(Level.WARN)
+
+    val logger = Logger.getLogger(Scheduler.getClass)
+    logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
+
+    val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
+
+    val appender: Appender = new ConsoleAppender(layout)
+    //    if (Config.log == null) appender = new ConsoleAppender(layout)
+    //    else appender = new DailyRollingFileAppender(layout, Config.log.getPath, "'.'yyyy-MM-dd")
+
+    root.addAppender(appender)
+  }
+
+  class JettyLog4jLogger extends org.eclipse.jetty.util.log.Logger {
+    private var logger: Logger = Logger.getLogger("Jetty")
+
+    def this(logger: Logger) {
+      this()
+      this.logger = logger
+    }
+
+    def isDebugEnabled: Boolean = logger.isDebugEnabled
+
+    def setDebugEnabled(enabled: Boolean) = logger.setLevel(if (enabled) Level.DEBUG else Level.INFO)
+
+    def getName: String = logger.getName
+
+    def getLogger(name: String): org.eclipse.jetty.util.log.Logger = new JettyLog4jLogger(Logger.getLogger(name))
+
+    def info(s: String, args: AnyRef*) = logger.info(format(s, args))
+
+    def info(s: String, t: Throwable) = logger.info(s, t)
+
+    def info(t: Throwable) = logger.info("", t)
+
+    def debug(s: String, args: AnyRef*) = logger.debug(format(s, args))
+
+    def debug(s: String, t: Throwable) = logger.debug(s, t)
+
+    def debug(t: Throwable) = logger.debug("", t)
+
+    def warn(s: String, args: AnyRef*) = logger.warn(format(s, args))
+
+    def warn(s: String, t: Throwable) = logger.warn(s, t)
+
+    def warn(s: String) = logger.warn(s)
+
+    def warn(t: Throwable) = logger.warn("", t)
+
+    def ignore(t: Throwable) = logger.info("Ignored", t)
+  }
+
+  private def format(s: String, args: AnyRef*): String = {
+    var result: String = ""
+    var i: Int = 0
+
+    for (token <- s.split("\\{\\}")) {
+      result += token
+      if (args.length > i) result += args(i)
+      i += 1
+    }
+
+    result
   }
 }

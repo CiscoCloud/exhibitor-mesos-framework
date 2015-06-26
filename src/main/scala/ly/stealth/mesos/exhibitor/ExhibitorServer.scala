@@ -18,28 +18,54 @@
 
 package ly.stealth.mesos.exhibitor
 
+import com.google.protobuf.ByteString
 import org.apache.mesos.Protos
 import org.apache.mesos.Protos.{Offer, TaskID, TaskInfo}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsValue, Json, Writes, _}
 
-case class ExhibitorServer(var id: String = "0") {
-  var cpus: Double = 0.2
-  var mem: Double = 256
+import scala.collection.mutable
 
-  private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Stopped
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var cpus: Double = 0.2, var mem: Double = 256)
+
+object TaskConfig {
+  def apply(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String): TaskConfig = new TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String)
+
+  implicit val reader = (
+    (__ \ 'exhibitorConfig).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
+      (__ \ 'sharedConfigOverride).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
+      (__ \ 'id).read[String])(TaskConfig.apply _)
+
+  implicit val writer = new Writes[TaskConfig] {
+    def writes(tc: TaskConfig): JsValue = {
+      Json.obj(
+        "exhibitorConfig" -> tc.exhibitorConfig.toMap[String, String],
+        "sharedConfigOverride" -> tc.sharedConfigOverride.toMap[String, String],
+        "id" -> tc.id
+      )
+    }
+  }
+}
+
+case class ExhibitorServer(id: String) {
+  val config = TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), id)
+
+  private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Added
 
   def createTask(offer: Offer): Option[TaskInfo] = {
     val cpus = Util.getScalarResources(offer, "cpus")
     val mem = Util.getScalarResources(offer, "mem")
     val portOpt = getPort(offer)
 
-    if (cpus > this.cpus && mem > this.mem && portOpt.nonEmpty) {
+    if (cpus > this.config.cpus && mem > this.config.mem && portOpt.nonEmpty) {
       val id = s"exhibitor-${this.id}-${offer.getHostname}-${portOpt.get}"
+      this.config.exhibitorConfig.put("port", portOpt.get.toString)
       val taskId = TaskID.newBuilder().setValue(id).build
       val taskInfo = TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
         .setExecutor(Scheduler.newExecutor(id))
-        .setData(Scheduler.taskData(portOpt.get))
-        .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.cpus)))
-        .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.mem)))
+        .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
+        .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
+        .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
         .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
         Protos.Value.Ranges.newBuilder().addRange(Protos.Value.Range.newBuilder().setBegin(portOpt.get).setEnd(portOpt.get))
       )).build
@@ -63,6 +89,8 @@ object ExhibitorServer {
   }
 
   sealed trait State
+
+  case object Added extends State
 
   case object Stopped extends State
 

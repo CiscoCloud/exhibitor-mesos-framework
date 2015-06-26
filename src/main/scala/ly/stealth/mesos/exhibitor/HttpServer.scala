@@ -26,6 +26,7 @@ import org.eclipse.jetty.server.{Server, ServerConnector}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 
+import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
 
 object HttpServer {
@@ -34,9 +35,11 @@ object HttpServer {
 
   val jarMask = "mesos-exhibitor.*\\.jar"
   val exhibitorMask = "exhibitor.*\\.jar"
+  val zookeeperMask = "zookeeper.*"
 
   private[exhibitor] var jar: File = null
   private[exhibitor] var exhibitorDist: File = null
+  private[exhibitor] var zookeeperDist: File = null
 
   def start(resolveDeps: Boolean = true) {
     if (server != null) throw new IllegalStateException("HttpServer already started")
@@ -74,10 +77,12 @@ object HttpServer {
     for (file <- new File(".").listFiles()) {
       if (file.getName.matches(jarMask)) jar = file
       if (file.getName.matches(exhibitorMask)) exhibitorDist = file
+      if (file.getName.matches(zookeeperMask) && !file.isDirectory) zookeeperDist = file
     }
 
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
     if (exhibitorDist == null) throw new IllegalStateException(exhibitorMask + " not found in in current dir")
+    if (zookeeperDist == null) throw new IllegalStateException(zookeeperMask + " not found in in current dir")
   }
 
   class Servlet extends HttpServlet {
@@ -95,6 +100,7 @@ object HttpServer {
       val uri = request.getRequestURI
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
+      else if (uri.startsWith("/zookeeper/")) downloadFile(HttpServer.zookeeperDist, response)
       else if (uri.startsWith("/api")) handleApi(request, response)
       else response.sendError(404)
     }
@@ -112,6 +118,8 @@ object HttpServer {
       if (uri.startsWith("/")) uri = uri.substring(1)
 
       if (uri == "add") handleAddServer(request, response)
+      else if (uri == "start") handleStartServer(request, response)
+      else if (uri == "config") handleConfigureServer(request, response)
       else response.sendError(404)
     }
 
@@ -121,10 +129,38 @@ object HttpServer {
       val mem = Option(request.getParameter("mem"))
 
       val server = ExhibitorServer(id)
-      cpus.foreach(cpus => server.cpus = cpus.toDouble)
-      mem.foreach(mem => server.mem = mem.toDouble)
+      cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
+      mem.foreach(mem => server.config.mem = mem.toDouble)
 
       Scheduler.cluster.servers += server
+    }
+
+    private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val id = request.getParameter("id")
+
+      Scheduler.cluster.getServer(id) match {
+        case Some(s) =>
+          if (s.state == ExhibitorServer.Added) s.state = ExhibitorServer.Stopped
+          else logger.warn(s"Server $id already started")
+        case None => logger.warn(s"Received start server for unknown server id: $id")
+      }
+    }
+
+    private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath")
+    private val sharedConfigs = Set("zookeeper-install-directory", "zookeeper-data-directory")
+
+    private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val id = request.getParameter("id")
+
+      Scheduler.cluster.getServer(id) match {
+        case Some(s) =>
+          request.getParameterMap.toMap.foreach {
+            case (key, Array(value)) if exhibitorConfigs.contains(key) => s.config.exhibitorConfig += key -> value
+            case (key, Array(value)) if sharedConfigs.contains(key) => s.config.sharedConfigOverride += key -> value
+            case other => logger.debug(s"Got invalid configuration value: $other")
+          }
+        case None => logger.warn(s"Received configure server for unknown server id: $id")
+      }
     }
   }
 

@@ -18,13 +18,15 @@
 
 package ly.stealth.mesos.exhibitor
 
-import java.io.File
-import java.net.URLClassLoader
-import java.util
+import java.io.{DataOutputStream, File, IOException}
+import java.net.{HttpURLConnection, InetAddress, URL, URLClassLoader}
+import java.nio.file.{Files, Paths}
 
 import org.apache.log4j.Logger
+import play.api.libs.json._
 
-import scala.collection.JavaConversions._
+import scala.io.Source
+import scala.util.{Failure, Success, Try}
 
 class Exhibitor {
   private val logger = Logger.getLogger(classOf[Exhibitor])
@@ -32,15 +34,67 @@ class Exhibitor {
 
   def isStarted: Boolean = server != null
 
-  def start(props: util.Map[String, String]) {
+  def start(config: TaskConfig) {
     if (isStarted) throw new IllegalStateException("Already started")
 
     Thread.currentThread().setContextClassLoader(Exhibitor.loader)
 
-    server = Exhibitor.newServer(props)
+    server = Exhibitor.newServer(config.exhibitorConfig.toMap)
 
     logger.info("Starting Exhibitor Server")
     server.getClass.getMethod("start").invoke(server)
+
+    addToEnsemble(config)
+  }
+
+  def addToEnsemble(config: TaskConfig) {
+    val port = config.exhibitorConfig("port").toInt
+    val sharedConfig = getSharedConfig(port, 60)
+
+    var updatedSharedConfig = config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
+      key match {
+        case "zookeeper-install-directory" => conf.copy(zookeeperInstallDirectory = value)
+        case "zookeeper-data-directory" => conf.copy(zookeeperDataDirectory = value)
+        case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
+      }
+    }
+
+    //TODO what if other exhibitor changes this property? ugh
+    if (updatedSharedConfig.zookeeperInstallDirectory != "") {
+      new File(updatedSharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
+      Files.createSymbolicLink(Paths.get(updatedSharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
+    }
+
+    val serverSpecEntry = s"S:${config.id}:${InetAddress.getLocalHost.getCanonicalHostName}"
+    if (updatedSharedConfig.serversSpec.isEmpty) updatedSharedConfig = updatedSharedConfig.copy(serversSpec = serverSpecEntry)
+    else updatedSharedConfig = updatedSharedConfig.copy(serversSpec = updatedSharedConfig.serversSpec + "," + serverSpecEntry)
+
+    ExhibitorAPI.setConfig(updatedSharedConfig, port)
+  }
+
+  private def getSharedConfig(apiPort: Int, retries: Int): SharedConfig = {
+    def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
+      Try(ExhibitorAPI.getSystemState(apiPort)) match {
+        case Success(config) =>
+          if (config.zookeeperInstallDirectory == "") {
+            if (retriesLeft > 0) {
+              Thread.sleep(backoffMs)
+              getSharedConfig(apiPort, retriesLeft - 1)
+            } else {
+              logger.info(s"Failed to get non-default Exhibitor Shared Configuration within $retries retries. Using default.")
+              config
+            }
+          } else config
+        case Failure(e) =>
+          logger.info("Exhibitor API not available.")
+          if (retriesLeft > 0) {
+            Thread.sleep(backoffMs)
+            getSharedConfig(apiPort, retriesLeft - 1)
+          } else throw new IllegalStateException(s"Failed to get Exhibitor Shared Configuration within $retries retries")
+      }
+    }
+
+    tryGetConfig(retries, 1000)
   }
 
   def await() {
@@ -57,6 +111,14 @@ class Exhibitor {
     //  CloseableUtils.closeQuietly(closeable);
     //}
   }
+
+  private def findZookeeperDist: File = {
+    for (file <- new File(System.getProperty("user.dir")).listFiles()) {
+      if (file.getName.matches(HttpServer.zookeeperMask) && file.isDirectory) return file
+    }
+
+    throw new IllegalStateException("Directory that matches " + HttpServer.zookeeperMask + " not found in in current dir")
+  }
 }
 
 object Exhibitor {
@@ -69,8 +131,8 @@ object Exhibitor {
     }
   }
 
-  def newServer(props: util.Map[String, String]): AnyRef = {
-    val params = props.toMap.flatMap { case (key, value) =>
+  def newServer(props: Map[String, String]): AnyRef = {
+    val params = props.flatMap { case (key, value) =>
       Array(s"--$key", value)
     }.toArray
 
@@ -98,5 +160,110 @@ object Exhibitor {
       .newInstance(backupProvider, configProvider, builder, httpPort, securityHandler, securityArguments).asInstanceOf[AnyRef]
 
     exhibitorMain
+  }
+}
+
+case class Result(succeeded: Boolean, message: String)
+
+object Result {
+  implicit val reader = Json.reads[Result]
+}
+
+case class SharedConfig(logIndexDirectory: String, zookeeperInstallDirectory: String, zookeeperDataDirectory: String,
+                        zookeeperLogDirectory: String, serversSpec: String, backupExtra: String, zooCfgExtra: Map[String, String],
+                        javaEnvironment: String, log4jProperties: String, clientPort: Int, connectPort: Int,
+                        electionPort: Int, checkMs: Long, cleanupPeriodMs: Long, cleanupMaxFiles: Int,
+                        backupMaxStoreMs: Long, backupPeriodMs: Long, autoManageInstances: Int, autoManageInstancesSettlingPeriodMs: Long,
+                        observerThreshold: Int, autoManageInstancesFixedEnsembleSize: Int, autoManageInstancesApplyAllAtOnce: Int)
+
+object SharedConfig {
+  implicit val reader = Json.reads[SharedConfig]
+
+  // Exhibitor for some reason requires the values passed back to be strings, so have to define custom writer for it.
+  implicit val writer = new Writes[SharedConfig] {
+    def writes(sc: SharedConfig): JsValue = {
+      Json.obj(
+        "logIndexDirectory" -> sc.logIndexDirectory,
+        "zookeeperInstallDirectory" -> sc.zookeeperInstallDirectory,
+        "zookeeperDataDirectory" -> sc.zookeeperDataDirectory,
+        "zookeeperLogDirectory" -> sc.zookeeperLogDirectory,
+        "serversSpec" -> sc.serversSpec,
+        "backupExtra" -> sc.backupExtra,
+        "zooCfgExtra" -> sc.zooCfgExtra,
+        "javaEnvironment" -> sc.javaEnvironment,
+        "log4jProperties" -> sc.log4jProperties,
+        "clientPort" -> sc.clientPort.toString,
+        "connectPort" -> sc.connectPort.toString,
+        "electionPort" -> sc.electionPort.toString,
+        "checkMs" -> sc.checkMs.toString,
+        "cleanupPeriodMs" -> sc.cleanupPeriodMs.toString,
+        "cleanupMaxFiles" -> sc.cleanupMaxFiles.toString,
+        "backupMaxStoreMs" -> sc.backupMaxStoreMs.toString,
+        "backupPeriodMs" -> sc.backupPeriodMs.toString,
+        "autoManageInstances" -> sc.autoManageInstances.toString,
+        "autoManageInstancesSettlingPeriodMs" -> sc.autoManageInstancesSettlingPeriodMs.toString,
+        "observerThreshold" -> sc.observerThreshold.toString,
+        "autoManageInstancesFixedEnsembleSize" -> sc.autoManageInstancesFixedEnsembleSize.toString,
+        "autoManageInstancesApplyAllAtOnce" -> sc.autoManageInstancesApplyAllAtOnce.toString
+      )
+    }
+  }
+}
+
+object ExhibitorAPI {
+  private val getSystemStateURL = "exhibitor/v1/config/get-state"
+  private val setConfigURL = "exhibitor/v1/config/set"
+
+  def getSystemState(port: Int = 8080): SharedConfig = {
+    val localhost = InetAddress.getLocalHost.getCanonicalHostName
+    val url = s"http://$localhost:$port/$getSystemStateURL"
+    val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      readResponse(connection, response => {
+        (Json.parse(response) \ "config").validate[SharedConfig] match {
+          case JsSuccess(config, _) => config
+          case JsError(error) => throw new IllegalStateException(error.toString())
+        }
+      })
+    } finally {
+      connection.disconnect()
+    }
+  }
+
+  def setConfig(config: SharedConfig, port: Int = 8080) {
+    val localhost = InetAddress.getLocalHost.getCanonicalHostName
+    val url = s"http://$localhost:$port/$setConfigURL"
+    val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      connection.setRequestMethod("POST")
+      connection.setRequestProperty("Content-Type", "application/json")
+
+      connection.setUseCaches(false)
+      connection.setDoInput(true)
+      connection.setDoOutput(true)
+
+      val out = new DataOutputStream(connection.getOutputStream)
+      out.writeBytes(Json.prettyPrint(Json.toJson(config)))
+      out.flush()
+      out.close()
+
+      readResponse(connection, response => {
+        Json.parse(response).validate[Result] match {
+          case JsSuccess(result, _) => if (!result.succeeded) throw new IllegalStateException(result.message)
+          case JsError(error) => throw new IllegalStateException(error.toString())
+        }
+      })
+    } finally {
+      connection.disconnect()
+    }
+  }
+
+  private def readResponse[A](connection: HttpURLConnection, reader: String => A): A = {
+    Try(Source.fromInputStream(connection.getInputStream).getLines().mkString) match {
+      case Success(response) => reader(response)
+      case Failure(e) =>
+        if (connection.getResponseCode != 200) throw new IOException(connection.getResponseCode + " - " + connection.getResponseMessage)
+        else throw e
+    }
   }
 }

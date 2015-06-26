@@ -51,6 +51,8 @@ object Cli {
     command match {
       case "scheduler" => handleScheduler(args)
       case "add" => handleAdd(args)
+      case "start" => handleStart(args)
+      case "config" => handleConfig(args)
     }
   }
 
@@ -71,6 +73,10 @@ object Cli {
       opt[String]('u', "user").required().text("Mesos user.").action { (value, config) =>
         config.updated("user", value)
       }
+
+      opt[Boolean]('d', "debug").optional().text("Debug mode.").action { (value, config) =>
+        config.updated("debug", value.toString)
+      }
     }
 
     parser.parse(args, Map()) match {
@@ -78,6 +84,7 @@ object Cli {
         Config.master = config("master")
         Config.user = config("user")
         Config.api = config("api")
+        config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
       case None => sys.exit(1)
@@ -85,7 +92,7 @@ object Cli {
   }
 
   def handleAdd(args: Array[String]) {
-    val parser = new OptionParser[Map[String, String]]("Scheduler") {
+    val parser = new OptionParser[Map[String, String]]("Add server") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -107,6 +114,65 @@ object Cli {
       case Some(config) =>
         Config.api = config("api")
         sendRequest("/add", config)
+      case None => sys.exit(1)
+    }
+  }
+
+  def handleStart(args: Array[String]) {
+    val parser = new OptionParser[Map[String, String]]("Start server") {
+      opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
+        config.updated("id", value)
+      }
+
+      opt[String]('a', "api").required().text("Binding host:port for http/artifact server.").action { (value, config) =>
+        config.updated("api", value)
+      }
+    }
+
+    parser.parse(args, Map()) match {
+      case Some(config) =>
+        Config.api = config("api")
+        sendRequest("/start", config)
+      case None => sys.exit(1)
+    }
+  }
+
+  def handleConfig(args: Array[String]) {
+    val parser = new OptionParser[Map[String, String]]("Configure server") {
+      opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
+        config.updated("id", value)
+      }
+
+      opt[String]('a', "api").required().text("Binding host:port for http/artifact server.").action { (value, config) =>
+        config.updated("api", value)
+      }
+
+      opt[String]("configtype").optional().text("Config type to use: s3 or zookeeper.").action { (value, config) =>
+        config.updated("configtype", value)
+      }
+
+      opt[String]("zkconfigconnect").optional().text("The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181...").action { (value, config) =>
+        config.updated("zkconfigconnect", value)
+      }
+
+      opt[String]("zkconfigzpath").optional().text("The base ZPath that Exhibitor should use. E.g: /exhibitor/config").action { (value, config) =>
+        config.updated("zkconfigzpath", value)
+      }
+
+      // shared configs
+      opt[String]("zookeeper-install-directory").optional().text("Zookeeper install directory shared config").action { (value, config) =>
+        config.updated("zookeeper-install-directory", value)
+      }
+
+      opt[String]("zookeeper-data-directory").optional().text("Zookeeper data directory shared config").action { (value, config) =>
+        config.updated("zookeeper-data-directory", value)
+      }
+    }
+
+    parser.parse(args, Map()) match {
+      case Some(config) =>
+        Config.api = config("api")
+        sendRequest("/config", config)
       case None => sys.exit(1)
     }
   }

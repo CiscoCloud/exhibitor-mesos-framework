@@ -21,6 +21,8 @@ package ly.stealth.mesos.exhibitor
 import java.net.URI
 
 object Config {
+  var debug: Boolean = false
+
   var master: String = null
   var user: String = null
 

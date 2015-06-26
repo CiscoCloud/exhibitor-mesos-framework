@@ -21,15 +21,18 @@ package ly.stealth.mesos.exhibitor
 import java.io.{PrintWriter, StringWriter}
 
 import ly.stealth.mesos.exhibitor.Util.Str
-import org.apache.log4j.Logger
+import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
+import play.api.libs.json.Json
 
 object Executor extends org.apache.mesos.Executor {
   private val logger = Logger.getLogger(Executor.getClass)
   private val exhibitor = new Exhibitor
 
   def main(args: Array[String]) {
+    initLogging()
+
     val driver = new MesosExecutorDriver(Executor)
     val status = if (driver.run eq Status.DRIVER_STOPPED) 0 else 1
 
@@ -56,7 +59,7 @@ object Executor extends org.apache.mesos.Executor {
         setName("Exhibitor")
 
         try {
-          exhibitor.start(Util.parseMap(task.getData.toStringUtf8))
+          exhibitor.start(Json.parse(task.getData.toStringUtf8).as[TaskConfig])
           driver.sendStatusUpdate(TaskStatus.newBuilder().setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build)
           exhibitor.await()
 
@@ -86,6 +89,19 @@ object Executor extends org.apache.mesos.Executor {
 
   def error(driver: ExecutorDriver, message: String) {
     logger.info("[error] " + message)
+  }
+
+  private def initLogging() {
+    BasicConfigurator.resetConfiguration()
+
+    val root = Logger.getRootLogger
+    root.setLevel(Level.INFO)
+
+    val logger = Logger.getLogger(Executor.getClass.getPackage.getName)
+    logger.setLevel(if (System.getProperty("debug") != null) Level.DEBUG else Level.INFO)
+
+    val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
+    root.addAppender(new ConsoleAppender(layout))
   }
 
   private def sendTaskFailed(driver: ExecutorDriver, task: TaskInfo, t: Throwable) {
