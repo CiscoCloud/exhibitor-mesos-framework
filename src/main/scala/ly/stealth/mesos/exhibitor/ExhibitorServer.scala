@@ -19,6 +19,7 @@
 package ly.stealth.mesos.exhibitor
 
 import com.google.protobuf.ByteString
+import org.apache.log4j.Logger
 import org.apache.mesos.Protos
 import org.apache.mesos.Protos.{Offer, TaskID, TaskInfo}
 import play.api.libs.functional.syntax._
@@ -83,6 +84,8 @@ case class ExhibitorServer(id: String) {
     val ports = Util.getRangeResources(offer, "ports")
     ports.headOption.map(_.getBegin)
   }
+
+  def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
 }
 
 object ExhibitorServer {

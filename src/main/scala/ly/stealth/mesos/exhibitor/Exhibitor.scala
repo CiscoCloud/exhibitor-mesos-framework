@@ -20,7 +20,6 @@ package ly.stealth.mesos.exhibitor
 
 import java.io.{DataOutputStream, File, IOException}
 import java.net.{HttpURLConnection, URL, URLClassLoader}
-import java.nio.file.{Files, Paths}
 
 import org.apache.log4j.Logger
 import play.api.libs.json._
@@ -50,60 +49,12 @@ class Exhibitor {
     logger.info("Starting Exhibitor Server")
     server.getClass.getMethod("start").invoke(server)
 
-    addToEnsemble()
-  }
-
-  def addToEnsemble() {
-    val sharedConfig = getSharedConfig(60)
-
-    val updatedSharedConfig = config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
-      key match {
-        case "zookeeper-install-directory" => conf.copy(zookeeperInstallDirectory = value)
-        case "zookeeper-data-directory" => conf.copy(zookeeperDataDirectory = value)
-        case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
-      }
-    }
-
-    //TODO what if other exhibitor changes this property? ugh
-    if (updatedSharedConfig.zookeeperInstallDirectory != "") {
-      new File(updatedSharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
-      Files.createSymbolicLink(Paths.get(updatedSharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
-    }
-
-    val updatedServersSpec = (s"S:${config.id}:${config.hostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, server) =>
-      server.split(":") match {
-        case Array(_, _, serverHost) if serverHost == config.hostname => servers
-        case Array(_, _, serverHost) => server :: servers
-        case _ => servers
-      }
-    }).mkString(",")
-
-    ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), this.url)
-  }
-
-  private def getSharedConfig(retries: Int): SharedConfig = {
-    def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
-      Try(ExhibitorAPI.getSystemState(this.url)) match {
-        case Success(cfg) =>
-          if (cfg.zookeeperInstallDirectory == "") {
-            if (retriesLeft > 0) {
-              Thread.sleep(backoffMs)
-              tryGetConfig(retriesLeft - 1, backoffMs)
-            } else {
-              logger.info(s"Failed to get non-default Exhibitor Shared Configuration within $retries retries. Using default.")
-              cfg
-            }
-          } else cfg
-        case Failure(e) =>
-          logger.info("Exhibitor API not available.")
-          if (retriesLeft > 0) {
-            Thread.sleep(backoffMs)
-            tryGetConfig(retriesLeft - 1, backoffMs)
-          } else throw new IllegalStateException(s"Failed to get Exhibitor Shared Configuration within $retries retries")
-      }
-    }
-
-    tryGetConfig(retries, 1000)
+    //TODO this should still be somewhere
+    //    //TODO what if other exhibitor changes this property? ugh
+    //    if (updatedSharedConfig.zookeeperInstallDirectory != "") {
+    //      new File(updatedSharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
+    //      Files.createSymbolicLink(Paths.get(updatedSharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
+    //    }
   }
 
   def await() {
@@ -220,6 +171,8 @@ object SharedConfig {
 }
 
 object ExhibitorAPI {
+  private val logger = Logger.getLogger(ExhibitorAPI.getClass)
+
   private val getSystemStateURL = "exhibitor/v1/config/get-state"
   private val setConfigURL = "exhibitor/v1/config/set"
 
@@ -239,6 +192,8 @@ object ExhibitorAPI {
   }
 
   def setConfig(config: SharedConfig, baseUrl: String) {
+    logger.debug(s"Trying to save shared config: $config")
+
     val url = s"$baseUrl/$setConfigURL"
     val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     try {

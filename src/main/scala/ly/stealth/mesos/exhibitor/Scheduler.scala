@@ -8,6 +8,7 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 
 import scala.collection.JavaConversions._
+import scala.util.{Failure, Success, Try}
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger = Logger.getLogger(this.getClass)
@@ -111,7 +112,13 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def onServerStarted(serverOpt: Option[ExhibitorServer], driver: SchedulerDriver, status: TaskStatus) {
     serverOpt match {
-      case Some(server) => server.state = ExhibitorServer.Running
+      case Some(server) =>
+        server.state = ExhibitorServer.Running
+        this.synchronized {
+          //TODO maybe should add it only once? not sure how often we receive Running statuses
+          logger.info(s"Adding server ${server.id} to ensemble")
+          addToEnsemble(server)
+        }
       case None =>
         logger.info(s"Got ${status.getState} for unknown/stopped server, killing task ${status.getTaskId}")
         driver.killTask(status.getTaskId)
@@ -142,6 +149,68 @@ object Scheduler extends org.apache.mesos.Scheduler {
       .build
   }
 
+  private def addToEnsemble(server: ExhibitorServer) {
+    val retries = 60 //TODO this should probably be configurable
+
+    def tryAddToEnsemble(retriesLeft: Int, backoffMs: Long) {
+      val sharedConfig = getSharedConfig(server, retriesLeft)
+
+      val updatedSharedConfig = server.config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
+        key match {
+          case "zookeeper-install-directory" => conf.copy(zookeeperInstallDirectory = value)
+          case "zookeeper-data-directory" => conf.copy(zookeeperDataDirectory = value)
+          case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
+        }
+      }
+
+      val updatedServersSpec = (s"S:${server.config.id}:${server.config.hostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
+        srv.split(":") match {
+          case Array(_, _, serverHost) if serverHost == server.config.hostname => servers
+          case Array(_, _, serverHost) => srv :: servers
+          case _ => servers
+        }
+      }).mkString(",")
+
+      Try(ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), server.url)) match {
+        case Success(_) =>
+        case Failure(e) =>
+          logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
+          if (retriesLeft > 0) {
+            logger.debug("Retrying...")
+            Thread.sleep(backoffMs)
+            tryAddToEnsemble(retries - 1, backoffMs)
+          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after $retries retries")
+      }
+    }
+
+    tryAddToEnsemble(retries, 1000)
+  }
+
+  private def getSharedConfig(server: ExhibitorServer, retries: Int): SharedConfig = {
+    def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
+      Try(ExhibitorAPI.getSystemState(server.url)) match {
+        case Success(cfg) =>
+          if (cfg.zookeeperInstallDirectory == "") {
+            if (retriesLeft > 0) {
+              Thread.sleep(backoffMs)
+              tryGetConfig(retriesLeft - 1, backoffMs)
+            } else {
+              logger.info(s"Failed to get non-default Exhibitor Shared Configuration after $retries retries. Using default.")
+              cfg
+            }
+          } else cfg
+        case Failure(e) =>
+          logger.info("Exhibitor API not available.")
+          if (retriesLeft > 0) {
+            Thread.sleep(backoffMs)
+            tryGetConfig(retriesLeft - 1, backoffMs)
+          } else throw new IllegalStateException(s"Failed to get Exhibitor Shared Configuration after $retries retries")
+      }
+    }
+
+    tryGetConfig(retries, 1000)
+  }
+
   private def initLogging() {
     System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
 
@@ -155,6 +224,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val logger = Logger.getLogger(Scheduler.getClass)
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
+    Logger.getLogger(ExhibitorAPI.getClass).setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
 
