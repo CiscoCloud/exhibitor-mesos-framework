@@ -19,7 +19,7 @@
 package ly.stealth.mesos.exhibitor
 
 import java.io.{DataOutputStream, File, IOException}
-import java.net.{HttpURLConnection, InetAddress, URL, URLClassLoader}
+import java.net.{HttpURLConnection, URL, URLClassLoader}
 import java.nio.file.{Files, Paths}
 
 import org.apache.log4j.Logger
@@ -32,10 +32,16 @@ class Exhibitor {
   private val logger = Logger.getLogger(classOf[Exhibitor])
   @volatile var server: AnyRef = null
 
+  private var config: TaskConfig = null
+
+  def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
+
   def isStarted: Boolean = server != null
 
   def start(config: TaskConfig) {
     if (isStarted) throw new IllegalStateException("Already started")
+
+    this.config = config
 
     Thread.currentThread().setContextClassLoader(Exhibitor.loader)
 
@@ -44,14 +50,13 @@ class Exhibitor {
     logger.info("Starting Exhibitor Server")
     server.getClass.getMethod("start").invoke(server)
 
-    addToEnsemble(config)
+    addToEnsemble()
   }
 
-  def addToEnsemble(config: TaskConfig) {
-    val port = config.exhibitorConfig("port").toInt
-    val sharedConfig = getSharedConfig(port, 60)
+  def addToEnsemble() {
+    val sharedConfig = getSharedConfig(60)
 
-    var updatedSharedConfig = config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
+    val updatedSharedConfig = config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
       key match {
         case "zookeeper-install-directory" => conf.copy(zookeeperInstallDirectory = value)
         case "zookeeper-data-directory" => conf.copy(zookeeperDataDirectory = value)
@@ -65,31 +70,35 @@ class Exhibitor {
       Files.createSymbolicLink(Paths.get(updatedSharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
     }
 
-    val serverSpecEntry = s"S:${config.id}:${InetAddress.getLocalHost.getCanonicalHostName}"
-    if (updatedSharedConfig.serversSpec.isEmpty) updatedSharedConfig = updatedSharedConfig.copy(serversSpec = serverSpecEntry)
-    else updatedSharedConfig = updatedSharedConfig.copy(serversSpec = updatedSharedConfig.serversSpec + "," + serverSpecEntry)
+    val updatedServersSpec = (s"S:${config.id}:${config.hostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, server) =>
+      server.split(":") match {
+        case Array(_, _, serverHost) if serverHost == config.hostname => servers
+        case Array(_, _, serverHost) => server :: servers
+        case _ => servers
+      }
+    }).mkString(",")
 
-    ExhibitorAPI.setConfig(updatedSharedConfig, port)
+    ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), this.url)
   }
 
-  private def getSharedConfig(apiPort: Int, retries: Int): SharedConfig = {
+  private def getSharedConfig(retries: Int): SharedConfig = {
     def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
-      Try(ExhibitorAPI.getSystemState(apiPort)) match {
-        case Success(config) =>
-          if (config.zookeeperInstallDirectory == "") {
+      Try(ExhibitorAPI.getSystemState(this.url)) match {
+        case Success(cfg) =>
+          if (cfg.zookeeperInstallDirectory == "") {
             if (retriesLeft > 0) {
               Thread.sleep(backoffMs)
-              getSharedConfig(apiPort, retriesLeft - 1)
+              tryGetConfig(retriesLeft - 1, backoffMs)
             } else {
               logger.info(s"Failed to get non-default Exhibitor Shared Configuration within $retries retries. Using default.")
-              config
+              cfg
             }
-          } else config
+          } else cfg
         case Failure(e) =>
           logger.info("Exhibitor API not available.")
           if (retriesLeft > 0) {
             Thread.sleep(backoffMs)
-            getSharedConfig(apiPort, retriesLeft - 1)
+            tryGetConfig(retriesLeft - 1, backoffMs)
           } else throw new IllegalStateException(s"Failed to get Exhibitor Shared Configuration within $retries retries")
       }
     }
@@ -214,9 +223,8 @@ object ExhibitorAPI {
   private val getSystemStateURL = "exhibitor/v1/config/get-state"
   private val setConfigURL = "exhibitor/v1/config/set"
 
-  def getSystemState(port: Int = 8080): SharedConfig = {
-    val localhost = InetAddress.getLocalHost.getCanonicalHostName
-    val url = s"http://$localhost:$port/$getSystemStateURL"
+  def getSystemState(baseUrl: String): SharedConfig = {
+    val url = s"$baseUrl/$getSystemStateURL"
     val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     try {
       readResponse(connection, response => {
@@ -230,9 +238,8 @@ object ExhibitorAPI {
     }
   }
 
-  def setConfig(config: SharedConfig, port: Int = 8080) {
-    val localhost = InetAddress.getLocalHost.getCanonicalHostName
-    val url = s"http://$localhost:$port/$setConfigURL"
+  def setConfig(config: SharedConfig, baseUrl: String) {
+    val url = s"$baseUrl/$setConfigURL"
     val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
     try {
       connection.setRequestMethod("POST")

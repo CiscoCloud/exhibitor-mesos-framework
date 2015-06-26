@@ -25,6 +25,7 @@ import org.apache.log4j.Logger
 import org.eclipse.jetty.server.{Server, ServerConnector}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
+import play.api.libs.json.Json
 
 import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
@@ -133,6 +134,9 @@ object HttpServer {
       mem.foreach(mem => server.config.mem = mem.toDouble)
 
       Scheduler.cluster.servers += server
+      logger.info(s"Added server to cluster: $server")
+
+      response.getWriter.println(Json.toJson(server))
     }
 
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
@@ -140,9 +144,16 @@ object HttpServer {
 
       Scheduler.cluster.getServer(id) match {
         case Some(s) =>
-          if (s.state == ExhibitorServer.Added) s.state = ExhibitorServer.Stopped
+          if (s.state == ExhibitorServer.Added) {
+            s.state = ExhibitorServer.Stopped
+            logger.info(s"Starting server $id")
+          }
           else logger.warn(s"Server $id already started")
-        case None => logger.warn(s"Received start server for unknown server id: $id")
+
+          response.getWriter.println(Json.toJson(s))
+        case None =>
+          logger.warn(s"Received start server for unknown server id: $id")
+          handleUnknownServer(id, response)
       }
     }
 
@@ -154,14 +165,26 @@ object HttpServer {
 
       Scheduler.cluster.getServer(id) match {
         case Some(s) =>
+          logger.info(s"Received configurations for server $id: ${request.getParameterMap.toMap.map(entry => entry._1 -> entry._2.head)}")
+
           request.getParameterMap.toMap.foreach {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => s.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => s.config.sharedConfigOverride += key -> value
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
-        case None => logger.warn(s"Received configure server for unknown server id: $id")
+
+          response.getWriter.println(Json.toJson(s))
+        case None =>
+          logger.warn(s"Received configure server for unknown server id: $id")
+          handleUnknownServer(id, response)
       }
     }
+  }
+
+  private def handleUnknownServer(id: String, response: HttpServletResponse) {
+    val unknownServer = ExhibitorServer(id)
+    unknownServer.state = ExhibitorServer.Unknown
+    response.getWriter.println(Json.toJson(unknownServer))
   }
 
 }

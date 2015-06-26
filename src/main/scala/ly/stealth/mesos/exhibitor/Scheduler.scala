@@ -72,7 +72,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   override def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]) {
-    logger.info("[resourceOffers]\n" + Str.offers(offers))
+    logger.debug("[resourceOffers]\n" + Str.offers(offers))
 
     offers.foreach { offer =>
       cluster.servers.find(_.state == ExhibitorServer.Stopped) match {
@@ -86,7 +86,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
               driver.declineOffer(offer.getId)
           }
         case None =>
-          logger.debug(s"All servers are running")
           driver.declineOffer(offer.getId)
       }
     }
@@ -160,8 +159,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
 
     val appender: Appender = new ConsoleAppender(layout)
-    //    if (Config.log == null) appender = new ConsoleAppender(layout)
-    //    else appender = new DailyRollingFileAppender(layout, Config.log.getPath, "'.'yyyy-MM-dd")
 
     root.addAppender(appender)
   }

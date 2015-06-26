@@ -21,6 +21,7 @@ package ly.stealth.mesos.exhibitor
 import java.io.IOException
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
+import play.api.libs.json.{JsValue, Json}
 import scopt.OptionParser
 
 import scala.io.Source
@@ -113,7 +114,9 @@ object Cli {
     parser.parse(args, Map()) match {
       case Some(config) =>
         Config.api = config("api")
-        sendRequest("/add", config)
+
+        val server = sendRequest("/add", config).as[ExhibitorServer]
+        printExhibitorServer(server)
       case None => sys.exit(1)
     }
   }
@@ -132,7 +135,9 @@ object Cli {
     parser.parse(args, Map()) match {
       case Some(config) =>
         Config.api = config("api")
-        sendRequest("/start", config)
+
+        val server = sendRequest("/start", config).as[ExhibitorServer]
+        printExhibitorServer(server)
       case None => sys.exit(1)
     }
   }
@@ -172,12 +177,14 @@ object Cli {
     parser.parse(args, Map()) match {
       case Some(config) =>
         Config.api = config("api")
-        sendRequest("/config", config)
+
+        val server = sendRequest("/config", config).as[ExhibitorServer]
+        printExhibitorServer(server)
       case None => sys.exit(1)
     }
   }
 
-  private[exhibitor] def sendRequest(uri: String, params: Map[String, String]) {
+  private[exhibitor] def sendRequest(uri: String, params: Map[String, String]): JsValue = {
     def queryString(params: Map[String, String]): String = {
       var s = ""
       params.foreach { case (name, value) =>
@@ -206,6 +213,29 @@ object Cli {
       connection.disconnect()
     }
 
-    //TODO return something
+    Json.parse(response)
+  }
+
+  private def printLine(s: AnyRef = "", indent: Int = 0) = println("  " * indent + s)
+
+  private def printExhibitorServer(server: ExhibitorServer) {
+    printLine("server:")
+    printLine(s"id: ${server.id}", 1)
+    printLine(s"state: ${server.state}", 1)
+    printTaskConfig(server.config, 1)
+    printLine()
+  }
+
+  private def printTaskConfig(config: TaskConfig, indent: Int) {
+    printLine("exhibitor config:", indent)
+    config.exhibitorConfig.foreach { case (k, v) =>
+      printLine(s"$k: $v", indent + 1)
+    }
+    printLine("shared config overrides:", indent)
+    config.sharedConfigOverride.foreach { case (k, v) =>
+      printLine(s"$k: $v", indent + 1)
+    }
+    printLine(s"cpu: ${config.cpus}", indent)
+    printLine(s"mem: ${config.mem}", indent)
   }
 }

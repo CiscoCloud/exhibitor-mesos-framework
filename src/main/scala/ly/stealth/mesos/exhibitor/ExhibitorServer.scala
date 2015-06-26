@@ -26,22 +26,26 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 
 import scala.collection.mutable
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var cpus: Double = 0.2, var mem: Double = 256)
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var cpus: Double = 0.2, var mem: Double = 256)
 
 object TaskConfig {
-  def apply(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String): TaskConfig = new TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String)
+  def apply(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, hostname: String): TaskConfig = new TaskConfig(exhibitorConfig, sharedConfigOverride, id, hostname)
 
   implicit val reader = (
     (__ \ 'exhibitorConfig).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
       (__ \ 'sharedConfigOverride).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
-      (__ \ 'id).read[String])(TaskConfig.apply _)
+      (__ \ 'id).read[String] and
+      (__ \ 'hostname).read[String])(TaskConfig.apply _)
 
   implicit val writer = new Writes[TaskConfig] {
     def writes(tc: TaskConfig): JsValue = {
       Json.obj(
         "exhibitorConfig" -> tc.exhibitorConfig.toMap[String, String],
         "sharedConfigOverride" -> tc.sharedConfigOverride.toMap[String, String],
-        "id" -> tc.id
+        "id" -> tc.id,
+        "hostname" -> tc.hostname,
+        "cpu" -> tc.cpus,
+        "mem" -> tc.mem
       )
     }
   }
@@ -60,6 +64,7 @@ case class ExhibitorServer(id: String) {
     if (cpus > this.config.cpus && mem > this.config.mem && portOpt.nonEmpty) {
       val id = s"exhibitor-${this.id}-${offer.getHostname}-${portOpt.get}"
       this.config.exhibitorConfig.put("port", portOpt.get.toString)
+      this.config.hostname = offer.getHostname
       val taskId = TaskID.newBuilder().setValue(id).build
       val taskInfo = TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
         .setExecutor(Scheduler.newExecutor(id))
@@ -90,6 +95,8 @@ object ExhibitorServer {
 
   sealed trait State
 
+  case object Unknown extends State
+
   case object Added extends State
 
   case object Stopped extends State
@@ -98,4 +105,32 @@ object ExhibitorServer {
 
   case object Running extends State
 
+  implicit val writer = new Writes[ExhibitorServer] {
+    def writes(es: ExhibitorServer): JsValue = {
+      Json.obj(
+        "id" -> es.id,
+        "state" -> es.state.toString,
+        "config" -> es.config
+      )
+    }
+  }
+
+  implicit val reader = (
+    (__ \ 'id).read[String] and
+      (__ \ 'state).read[String] and
+      (__ \ 'config).read[TaskConfig])((id, state, config) => {
+    val server = ExhibitorServer(id)
+    state match {
+      case "Unknown" => server.state = Unknown
+      case "Added" => server.state = Added
+      case "Stopped" => server.state = Stopped
+      case "Staging" => server.state = Staging
+      case "Running" => server.state = Running
+    }
+    config.exhibitorConfig.foreach(server.config.exhibitorConfig += _)
+    config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
+    server.config.cpus = config.cpus
+    server.config.mem = config.mem
+    server
+  })
 }
