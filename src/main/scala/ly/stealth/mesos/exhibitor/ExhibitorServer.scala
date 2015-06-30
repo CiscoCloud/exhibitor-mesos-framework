@@ -19,9 +19,8 @@
 package ly.stealth.mesos.exhibitor
 
 import com.google.protobuf.ByteString
-import org.apache.log4j.Logger
 import org.apache.mesos.Protos
-import org.apache.mesos.Protos.{Offer, TaskID, TaskInfo}
+import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsValue, Json, Writes, _}
 
@@ -68,7 +67,7 @@ case class ExhibitorServer(id: String) {
       this.config.hostname = offer.getHostname
       val taskId = TaskID.newBuilder().setValue(id).build
       val taskInfo = TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-        .setExecutor(Scheduler.newExecutor(id))
+        .setExecutor(newExecutor(id))
         .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
         .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
         .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
@@ -78,6 +77,28 @@ case class ExhibitorServer(id: String) {
 
       Some(taskInfo)
     } else None
+  }
+
+  private def newExecutor(id: String): ExecutorInfo = {
+    val cmd = s"java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
+
+    val commandBuilder = CommandInfo.newBuilder()
+    commandBuilder
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/exhibitor/" + HttpServer.exhibitorDist.getName))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/zookeeper/" + HttpServer.zookeeperDist.getName).setExtract(true))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
+      .setValue(cmd)
+
+    this.config.exhibitorConfig.get("s3credentials").foreach { creds =>
+      commandBuilder
+        .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/s3credentials/" + creds))
+    }
+
+    ExecutorInfo.newBuilder()
+      .setExecutorId(ExecutorID.newBuilder().setValue(id))
+      .setCommand(commandBuilder)
+      .setName(s"exhibitor-$id")
+      .build
   }
 
   private def getPort(offer: Offer): Option[Long] = {

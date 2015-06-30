@@ -102,6 +102,7 @@ object HttpServer {
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
       else if (uri.startsWith("/zookeeper/")) downloadFile(HttpServer.zookeeperDist, response)
+      else if (uri.startsWith("/s3credentials/")) downloadFile(new File(uri.split("/").last), response)
       else if (uri.startsWith("/api")) handleApi(request, response)
       else response.sendError(404)
     }
@@ -157,7 +158,8 @@ object HttpServer {
       }
     }
 
-    private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath")
+    private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath", "s3credentials",
+      "s3region", "s3config", "s3configprefix")
     private val sharedConfigs = Set("zookeeper-install-directory", "zookeeper-data-directory")
 
     private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {

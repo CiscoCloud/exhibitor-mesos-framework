@@ -164,6 +164,22 @@ object Cli {
         config.updated("zkconfigzpath", value)
       }
 
+      opt[String]("s3credentials").optional().text("Optional credentials to use for s3backup or s3config").action { (value, config) =>
+        config.updated("s3credentials", value)
+      }
+
+      opt[String]("s3region").optional().text("Optional region for S3 calls (e.g. \"eu-west-1\")").action { (value, config) =>
+        config.updated("s3region", value)
+      }
+
+      opt[String]("s3config").optional().text("The bucket name and key to store the config (s3credentials may be provided as well). Argument is [bucket name]:[key].").action { (value, config) =>
+        config.updated("s3config", value)
+      }
+
+      opt[String]("s3configprefix").optional().text("When using AWS S3 shared config files, the prefix to use for values such as locks.").action { (value, config) =>
+        config.updated("s3configprefix", value)
+      }
+
       // shared configs
       opt[String]("zookeeper-install-directory").optional().text("Zookeeper install directory shared config").action { (value, config) =>
         config.updated("zookeeper-install-directory", value)

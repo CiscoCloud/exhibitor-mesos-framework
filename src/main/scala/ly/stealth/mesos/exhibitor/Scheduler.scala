@@ -132,23 +132,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
-    val cmd = s"java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
-
-    val commandBuilder = CommandInfo.newBuilder()
-    commandBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/exhibitor/" + HttpServer.exhibitorDist.getName))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/zookeeper/" + HttpServer.zookeeperDist.getName).setExtract(true))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
-      .setValue(cmd)
-
-    ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder().setValue(id))
-      .setCommand(commandBuilder)
-      .setName(s"exhibitor-$id")
-      .build
-  }
-
   private def addToEnsemble(server: ExhibitorServer) {
     val retries = 60 //TODO this should probably be configurable
 
