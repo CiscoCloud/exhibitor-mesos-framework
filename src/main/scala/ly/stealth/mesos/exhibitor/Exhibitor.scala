@@ -20,6 +20,7 @@ package ly.stealth.mesos.exhibitor
 
 import java.io.{DataOutputStream, File, IOException}
 import java.net.{HttpURLConnection, URL, URLClassLoader}
+import java.nio.file.{Files, Paths}
 
 import org.apache.log4j.Logger
 import play.api.libs.json._
@@ -32,6 +33,7 @@ class Exhibitor {
   @volatile var server: AnyRef = null
 
   private var config: TaskConfig = null
+  private var sharedConfig: SharedConfig = null
 
   def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
 
@@ -49,12 +51,7 @@ class Exhibitor {
     logger.info("Starting Exhibitor Server")
     server.getClass.getMethod("start").invoke(server)
 
-    //TODO this should still be somewhere
-    //    //TODO what if other exhibitor changes this property? ugh
-    //    if (updatedSharedConfig.zookeeperInstallDirectory != "") {
-    //      new File(updatedSharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
-    //      Files.createSymbolicLink(Paths.get(updatedSharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
-    //    }
+    listenForConfigChanges()
   }
 
   def await() {
@@ -65,11 +62,34 @@ class Exhibitor {
   def stop() {
     if (server != null)
       server.getClass.getMethod("close").invoke(server)
+
+    server = null
     //TODO
     //for ( Closeable closeable : creator.getCloseables() )
     //{
     //  CloseableUtils.closeQuietly(closeable);
     //}
+  }
+
+  private def listenForConfigChanges() {
+    new Thread {
+      override def run() {
+        while (isStarted) {
+          val config = ExhibitorAPI.getSystemState(url)
+          if (config != sharedConfig) {
+            logger.debug("Shared configuration changed, applying changes")
+            sharedConfig = config
+
+            if (sharedConfig.zookeeperInstallDirectory != "") {
+              new File(sharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
+              Files.createSymbolicLink(Paths.get(sharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
+            }
+          }
+
+          Thread.sleep(10000) //TODO this should be configurable
+        }
+      }
+    }.start()
   }
 
   private def findZookeeperDist: File = {
