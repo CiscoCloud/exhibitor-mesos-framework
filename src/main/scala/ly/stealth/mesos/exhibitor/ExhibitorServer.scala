@@ -63,7 +63,8 @@ case class ExhibitorServer(id: String) {
     val mem = Util.getScalarResources(offer, "mem")
     val portOpt = getPort(offer)
 
-    if (cpus > this.config.cpus && mem > this.config.mem && portOpt.nonEmpty) {
+    // TODO replace with constraints
+    if (cpus > this.config.cpus && mem > this.config.mem && portOpt.nonEmpty && Scheduler.cluster.servers.find(_.config.hostname == offer.getHostname).isEmpty) {
       val id = s"exhibitor-${this.id}-${offer.getHostname}-${portOpt.get}"
       this.config.exhibitorConfig.put("port", portOpt.get.toString)
       this.config.hostname = offer.getHostname
