@@ -11,7 +11,6 @@ This is still being developed actively and is not yet alpha. [Open issues here](
 
 [Typical Operations](#typical-operations)  
 * [Changing the location of Zookeeper data](#changing-the-location-of-zookeeper-data)
-* 
 
 [Navigating the CLI](#navigating-the-cli)  
 * [Adding servers to the cluster](#adding-servers-to-the-cluster)  
@@ -19,7 +18,6 @@ This is still being developed actively and is not yet alpha. [Open issues here](
 * [Starting servers](#starting-servers-in-the-cluster)  
 * [Stopping servers](#stopping-servers-in-the-cluster)  
 * [Removing servers](#removing-servers-from-the-cluster)  
-* 
 
 Prerequisites
 -------------
