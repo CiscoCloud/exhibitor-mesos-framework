@@ -123,6 +123,7 @@ object HttpServer {
       else if (uri == "start") handleStartServer(request, response)
       else if (uri == "stop") handleStopServer(request, response)
       else if (uri == "remove") handleRemoveServer(request, response)
+      else if (uri == "status") handleClusterStatus(request, response)
       else if (uri == "config") handleConfigureServer(request, response)
       else response.sendError(404)
     }
@@ -180,6 +181,10 @@ object HttpServer {
           logger.warn(s"Received remove server for unknown server id: $id")
           handleUnknownServer(id, response)
       }
+    }
+
+    private def handleClusterStatus(request: HttpServletRequest, response: HttpServletResponse) {
+      response.getWriter.println(Json.toJson(Scheduler.cluster.servers.toList))
     }
 
     private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath", "s3credentials",

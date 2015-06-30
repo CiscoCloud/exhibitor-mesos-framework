@@ -51,8 +51,9 @@ object Cli {
 
     command match {
       case "scheduler" => handleScheduler(args)
-      case "add" | "remove" => handleAdd(args, command == "add")
+      case "add" | "remove" => handleAddRemove(args, command == "add")
       case "start" | "stop" => handleStartStop(args, command == "start")
+      case "status" => handleStatus(args)
       case "config" => handleConfig(args)
     }
   }
@@ -93,8 +94,8 @@ object Cli {
     }
   }
 
-  def handleAdd(args: Array[String], add: Boolean) {
-    val parser = new OptionParser[Map[String, String]]("Add server") {
+  def handleAddRemove(args: Array[String], add: Boolean) {
+    val parser = new OptionParser[Map[String, String]]("Add/Remove server") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -123,7 +124,7 @@ object Cli {
   }
 
   def handleStartStop(args: Array[String], start: Boolean) {
-    val parser = new OptionParser[Map[String, String]]("Start server") {
+    val parser = new OptionParser[Map[String, String]]("Start/Stop server") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -139,6 +140,23 @@ object Cli {
 
         val server = sendRequest(if (start) "/start" else "/stop", config).as[ExhibitorServer]
         printExhibitorServer(server)
+      case None => sys.exit(1)
+    }
+  }
+
+  def handleStatus(args: Array[String]) {
+    val parser = new OptionParser[Map[String, String]]("Cluster status") {
+      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server.").action { (value, config) =>
+        config.updated("api", value)
+      }
+    }
+
+    parser.parse(args, Map()) match {
+      case Some(config) =>
+        resolveApi(config.get("api"))
+
+        val cluster = sendRequest("/status", config).as[List[ExhibitorServer]]
+        printCluster(cluster)
       case None => sys.exit(1)
     }
   }
@@ -251,11 +269,16 @@ object Cli {
 
   private def printLine(s: AnyRef = "", indent: Int = 0) = println("  " * indent + s)
 
-  private def printExhibitorServer(server: ExhibitorServer) {
-    printLine("server:")
-    printLine(s"id: ${server.id}", 1)
-    printLine(s"state: ${server.state}", 1)
-    printTaskConfig(server.config, 1)
+  private def printCluster(cluster: List[ExhibitorServer]) {
+    printLine("cluster:")
+    cluster.foreach(printExhibitorServer(_, 1))
+  }
+
+  private def printExhibitorServer(server: ExhibitorServer, indent: Int = 0) {
+    printLine("server:", indent)
+    printLine(s"id: ${server.id}", indent + 1)
+    printLine(s"state: ${server.state}", indent + 1)
+    printTaskConfig(server.config, indent + 1)
     printLine()
   }
 
