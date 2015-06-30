@@ -150,6 +150,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[exhibitor] def removeServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
+      if (server.state == ExhibitorServer.Running) stopServer(id)
+
       server.state = ExhibitorServer.Stopped
       cluster.servers -= server
       removeFromEnsemble(server)

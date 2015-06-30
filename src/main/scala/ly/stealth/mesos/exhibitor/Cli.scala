@@ -82,9 +82,10 @@ object Cli {
 
     parser.parse(args, Map()) match {
       case Some(config) =>
+        resolveApi(config.get("api"))
+
         Config.master = config("master")
         Config.user = config("user")
-        Config.api = config("api")
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
@@ -106,14 +107,14 @@ object Cli {
         config.updated("mem", value)
       }
 
-      opt[String]('a', "api").required().text("Binding host:port for http/artifact server.").action { (value, config) =>
+      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server.").action { (value, config) =>
         config.updated("api", value)
       }
     }
 
     parser.parse(args, Map()) match {
       case Some(config) =>
-        Config.api = config("api")
+        resolveApi(config.get("api"))
 
         val server = sendRequest(if (add) "/add" else "/remove", config).as[ExhibitorServer]
         printExhibitorServer(server)
@@ -127,14 +128,14 @@ object Cli {
         config.updated("id", value)
       }
 
-      opt[String]('a', "api").required().text("Binding host:port for http/artifact server.").action { (value, config) =>
+      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server.").action { (value, config) =>
         config.updated("api", value)
       }
     }
 
     parser.parse(args, Map()) match {
       case Some(config) =>
-        Config.api = config("api")
+        resolveApi(config.get("api"))
 
         val server = sendRequest(if (start) "/start" else "/stop", config).as[ExhibitorServer]
         printExhibitorServer(server)
@@ -148,7 +149,7 @@ object Cli {
         config.updated("id", value)
       }
 
-      opt[String]('a', "api").required().text("Binding host:port for http/artifact server.").action { (value, config) =>
+      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server.").action { (value, config) =>
         config.updated("api", value)
       }
 
@@ -192,12 +193,28 @@ object Cli {
 
     parser.parse(args, Map()) match {
       case Some(config) =>
-        Config.api = config("api")
+        resolveApi(config.get("api"))
 
         val server = sendRequest("/config", config).as[ExhibitorServer]
         printExhibitorServer(server)
       case None => sys.exit(1)
     }
+  }
+
+  private def resolveApi(apiOption: Option[String]) {
+    if (Config.api != null) return
+
+    if (apiOption.isDefined) {
+      Config.api = apiOption.get
+      return
+    }
+
+    if (System.getenv("EM_API") != null) {
+      Config.api = System.getenv("EM_API")
+      return
+    }
+
+    throw new IllegalArgumentException("Undefined API url. Please provide either a CLI --api option or EM_API env.")
   }
 
   private[exhibitor] def sendRequest(uri: String, params: Map[String, String]): JsValue = {
