@@ -121,11 +121,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def onServerStarted(serverOpt: Option[ExhibitorServer], driver: SchedulerDriver, status: TaskStatus) {
     serverOpt match {
       case Some(server) =>
-        server.state = ExhibitorServer.Running
         this.synchronized {
-          //TODO maybe should add it only once? not sure how often we receive Running statuses
-          logger.info(s"Adding server ${server.id} to ensemble")
-          addToEnsemble(server)
+          if (server.state != ExhibitorServer.Running) {
+            logger.info(s"Adding server ${server.id} to ensemble")
+            addToEnsemble(server)
+            server.state = ExhibitorServer.Running
+          }
         }
       case None =>
         logger.info(s"Got ${status.getState} for unknown/stopped server, killing task ${status.getTaskId}")
