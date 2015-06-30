@@ -158,6 +158,7 @@ object ExhibitorServer {
     config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
     server.config.cpus = config.cpus
     server.config.mem = config.mem
+    server.config.hostname = config.hostname
     server
   })
 }

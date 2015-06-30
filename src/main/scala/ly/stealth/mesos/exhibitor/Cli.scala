@@ -63,7 +63,7 @@ object Cli {
   }
 
   def handleScheduler(args: Array[String]) {
-    val parser = new OptionParser[Map[String, String]]("Scheduler") {
+    val parser = new OptionParser[Map[String, String]]("scheduler") {
       opt[String]('m', "master").required().text("Mesos Master addresses.").action { (value, config) =>
         config.updated("master", value)
       }
@@ -95,7 +95,7 @@ object Cli {
   }
 
   def handleAddRemove(args: Array[String], add: Boolean) {
-    val parser = new OptionParser[Map[String, String]]("Add/Remove server") {
+    val parser = new OptionParser[Map[String, String]]("add|remove") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -124,7 +124,7 @@ object Cli {
   }
 
   def handleStartStop(args: Array[String], start: Boolean) {
-    val parser = new OptionParser[Map[String, String]]("Start/Stop server") {
+    val parser = new OptionParser[Map[String, String]]("start|stop") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -145,7 +145,7 @@ object Cli {
   }
 
   def handleStatus(args: Array[String]) {
-    val parser = new OptionParser[Map[String, String]]("Cluster status") {
+    val parser = new OptionParser[Map[String, String]]("status") {
       opt[String]('a', "api").optional().text("Binding host:port for http/artifact server.").action { (value, config) =>
         config.updated("api", value)
       }
@@ -162,7 +162,7 @@ object Cli {
   }
 
   def handleConfig(args: Array[String]) {
-    val parser = new OptionParser[Map[String, String]]("Configure server") {
+    val parser = new OptionParser[Map[String, String]]("config") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
       }
@@ -278,6 +278,9 @@ object Cli {
     printLine("server:", indent)
     printLine(s"id: ${server.id}", indent + 1)
     printLine(s"state: ${server.state}", indent + 1)
+    if (!server.config.hostname.isEmpty && server.config.exhibitorConfig.get("port").isDefined) {
+      printLine(s"endpoint: ${server.url}/exhibitor/v1/ui/index.html", indent + 1)
+    }
     printTaskConfig(server.config, indent + 1)
     printLine()
   }
