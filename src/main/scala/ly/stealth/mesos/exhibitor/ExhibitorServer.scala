@@ -52,6 +52,8 @@ object TaskConfig {
 }
 
 case class ExhibitorServer(id: String) {
+  private[exhibitor] var taskId: TaskID = null
+
   val config = TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), id)
 
   private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Added

@@ -60,10 +60,17 @@ class Exhibitor {
   }
 
   def stop() {
-    if (server != null)
-      server.getClass.getMethod("close").invoke(server)
+    this.synchronized {
+      if (server != null) {
+        val shutdownSignaledField = server.getClass.getDeclaredField("shutdownSignaled")
+        shutdownSignaledField.setAccessible(true)
+        val shutdownSignaled = shutdownSignaledField.get(server)
+        shutdownSignaled.getClass.getMethod("set", classOf[Boolean]).invoke(shutdownSignaled, true: java.lang.Boolean)
+        server.getClass.getMethod("close").invoke(server)
+      }
 
-    server = null
+      server = null
+    }
     //TODO
     //for ( Closeable closeable : creator.getCloseables() )
     //{

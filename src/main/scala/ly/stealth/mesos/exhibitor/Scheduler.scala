@@ -14,6 +14,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private val logger = Logger.getLogger(this.getClass)
 
   private[exhibitor] val cluster = Cluster()
+  private var driver: SchedulerDriver = null
 
   def start() {
     initLogging()
@@ -40,6 +41,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   override def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo) {
     logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
+
+    this.driver = driver
   }
 
   override def offerRescinded(driver: SchedulerDriver, id: OfferID) {
@@ -48,10 +51,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   override def disconnected(driver: SchedulerDriver) {
     logger.info("[disconnected]")
+
+    this.driver = null
   }
 
   override def reregistered(driver: SchedulerDriver, master: MasterInfo) {
     logger.info("[reregistered] master:" + Str.master(master))
+
+    this.driver = driver
   }
 
   override def slaveLost(driver: SchedulerDriver, id: SlaveID) {
@@ -81,6 +88,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
           server.createTask(offer) match {
             case Some(taskInfo) =>
               server.state = ExhibitorServer.Staging
+              server.taskId = taskInfo.getTaskId
               driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(taskInfo), Filters.newBuilder().setRefuseSeconds(1).build)
             case None =>
               logger.warn(s"Host ${offer.getHostname} lacks resources for a task to be launched")
@@ -102,10 +110,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
     status.getState match {
       case TaskState.TASK_RUNNING =>
         onServerStarted(server, driver, status)
-      case TaskState.TASK_LOST | TaskState.TASK_FINISHED |
-           TaskState.TASK_FAILED | TaskState.TASK_KILLED |
-           TaskState.TASK_ERROR =>
+      case TaskState.TASK_LOST | TaskState.TASK_FAILED |
+           TaskState.TASK_KILLED | TaskState.TASK_ERROR =>
         onServerStopped(server, status)
+      case TaskState.TASK_FINISHED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
   }
@@ -132,6 +140,23 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
+    cluster.getServer(id).map { server =>
+      driver.killTask(server.taskId)
+      server.state = ExhibitorServer.Added
+      server
+    }
+  }
+
+  private[exhibitor] def removeServer(id: String): Option[ExhibitorServer] = {
+    cluster.getServer(id).map { server =>
+      server.state = ExhibitorServer.Stopped
+      cluster.servers -= server
+      removeFromEnsemble(server)
+      server
+    }
+  }
+
   private def addToEnsemble(server: ExhibitorServer) {
     val retries = 60 //TODO this should probably be configurable
 
@@ -152,7 +177,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
           case Array(_, _, serverHost) => srv :: servers
           case _ => servers
         }
-      }).mkString(",")
+      }).sorted.mkString(",")
 
       Try(ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), server.url)) match {
         case Success(_) =>
@@ -167,6 +192,38 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     tryAddToEnsemble(retries, 1000)
+  }
+
+  private def removeFromEnsemble(server: ExhibitorServer) {
+    val retries = 60 //TODO this should probably be configurable
+
+    def tryRemoveFromEnsemble(aliveServer: ExhibitorServer, retriesLeft: Int, backoffMs: Long) {
+      val sharedConfig = getSharedConfig(aliveServer, retriesLeft)
+
+      val updatedServersSpec = sharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
+        srv.split(":") match {
+          case Array(_, _, serverHost) if serverHost == server.config.hostname => servers
+          case Array(_, _, serverHost) => srv :: servers
+          case _ => servers
+        }
+      }.sorted.mkString(",")
+
+      Try(ExhibitorAPI.setConfig(sharedConfig.copy(serversSpec = updatedServersSpec), aliveServer.url)) match {
+        case Success(_) =>
+        case Failure(e) =>
+          logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
+          if (retriesLeft > 0) {
+            logger.debug("Retrying...")
+            Thread.sleep(backoffMs)
+            tryRemoveFromEnsemble(aliveServer, retries - 1, backoffMs)
+          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after $retries retries")
+      }
+    }
+
+    cluster.servers.find(_.state == ExhibitorServer.Running) match {
+      case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, retries, 1000)
+      case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
+    }
   }
 
   private def getSharedConfig(server: ExhibitorServer, retries: Int): SharedConfig = {

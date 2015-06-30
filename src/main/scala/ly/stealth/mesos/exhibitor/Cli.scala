@@ -51,8 +51,8 @@ object Cli {
 
     command match {
       case "scheduler" => handleScheduler(args)
-      case "add" => handleAdd(args)
-      case "start" => handleStart(args)
+      case "add" | "remove" => handleAdd(args, command == "add")
+      case "start" | "stop" => handleStartStop(args, command == "start")
       case "config" => handleConfig(args)
     }
   }
@@ -92,7 +92,7 @@ object Cli {
     }
   }
 
-  def handleAdd(args: Array[String]) {
+  def handleAdd(args: Array[String], add: Boolean) {
     val parser = new OptionParser[Map[String, String]]("Add server") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
@@ -115,13 +115,13 @@ object Cli {
       case Some(config) =>
         Config.api = config("api")
 
-        val server = sendRequest("/add", config).as[ExhibitorServer]
+        val server = sendRequest(if (add) "/add" else "/remove", config).as[ExhibitorServer]
         printExhibitorServer(server)
       case None => sys.exit(1)
     }
   }
 
-  def handleStart(args: Array[String]) {
+  def handleStartStop(args: Array[String], start: Boolean) {
     val parser = new OptionParser[Map[String, String]]("Start server") {
       opt[String]('i', "id").required().text("Server id.").action { (value, config) =>
         config.updated("id", value)
@@ -136,7 +136,7 @@ object Cli {
       case Some(config) =>
         Config.api = config("api")
 
-        val server = sendRequest("/start", config).as[ExhibitorServer]
+        val server = sendRequest(if (start) "/start" else "/stop", config).as[ExhibitorServer]
         printExhibitorServer(server)
       case None => sys.exit(1)
     }

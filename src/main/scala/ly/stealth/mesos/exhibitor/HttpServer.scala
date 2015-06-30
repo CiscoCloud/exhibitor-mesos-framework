@@ -121,6 +121,8 @@ object HttpServer {
 
       if (uri == "add") handleAddServer(request, response)
       else if (uri == "start") handleStartServer(request, response)
+      else if (uri == "stop") handleStopServer(request, response)
+      else if (uri == "remove") handleRemoveServer(request, response)
       else if (uri == "config") handleConfigureServer(request, response)
       else response.sendError(404)
     }
@@ -148,12 +150,34 @@ object HttpServer {
           if (s.state == ExhibitorServer.Added) {
             s.state = ExhibitorServer.Stopped
             logger.info(s"Starting server $id")
-          }
-          else logger.warn(s"Server $id already started")
+          } else logger.warn(s"Server $id already started")
 
           response.getWriter.println(Json.toJson(s))
         case None =>
           logger.warn(s"Received start server for unknown server id: $id")
+          handleUnknownServer(id, response)
+      }
+    }
+
+    private def handleStopServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val id = request.getParameter("id")
+      Scheduler.stopServer(id) match {
+        case Some(s) =>
+          response.getWriter.println(Json.toJson(s))
+        case None =>
+          logger.warn(s"Received stop server for unknown server id: $id")
+          handleUnknownServer(id, response)
+      }
+    }
+
+    private def handleRemoveServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val id = request.getParameter("id")
+      Scheduler.removeServer(id) match {
+        case Some(s) =>
+          logger.info("Cluster after removal: " + Scheduler.cluster.servers)
+          response.getWriter.println(Json.toJson(s))
+        case None =>
+          logger.warn(s"Received remove server for unknown server id: $id")
           handleUnknownServer(id, response)
       }
     }
