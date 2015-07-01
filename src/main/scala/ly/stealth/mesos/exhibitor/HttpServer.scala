@@ -132,10 +132,12 @@ object HttpServer {
       val id = request.getParameter("id")
       val cpus = Option(request.getParameter("cpu"))
       val mem = Option(request.getParameter("mem"))
+      val backoff = Option(request.getParameter("configchangebackoff"))
 
       val server = ExhibitorServer(id)
       cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
       mem.foreach(mem => server.config.mem = mem.toDouble)
+      backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
 
       Scheduler.cluster.servers += server
       logger.info(s"Added server to cluster: $server")

@@ -72,8 +72,13 @@ Usage: scheduler [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   -u <value> | --user <value>
         Mesos user. Required.
+  --ensemblemodifyretries <value>
+        Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.
+  --ensemblemodifybackoff <value>
+        Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.
   -d <value> | --debug <value>
         Debug mode. Optional. Defaults to false.
+
 ```
 
 Run the scheduler
@@ -106,6 +111,7 @@ server:
   shared config overrides:
   cpu: 0.2
   mem: 256.0
+  sharedConfigChangeBackoff: 10000
 ```
 
 You now have a cluster with 1 server that is not started.
@@ -120,6 +126,7 @@ cluster:
     shared config overrides:
     cpu: 0.2
     mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 Each server requires some basic configuration.
@@ -138,6 +145,7 @@ server:
     zookeeper-data-directory: /tmp/zkdata
   cpu: 0.2
   mem: 256.0
+  sharedConfigChangeBackoff: 10000
 ```
 
 Now lets start the server. The state should change from `Added` to `Stopped` meaning the task is waiting for resources to be offered.
@@ -158,6 +166,7 @@ server:
     zookeeper-data-directory: /tmp/zkdata
   cpu: 0.2
   mem: 256.0
+  sharedConfigChangeBackoff: 10000
 ```
 
 Now as we don't know where the server we may ask for the cluster status to see where the endpoint is.
@@ -179,6 +188,7 @@ cluster:
       zookeeper-data-directory: /tmp/zkdata
     cpu: 0.2
     mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 By now you should have a single Exhibitor instance running. Here's how you stop it:
@@ -218,6 +228,7 @@ server:
     zookeeper-data-directory: /tmp/exhibitor_zkdata
   cpu: 0.2
   mem: 256.0
+  sharedConfigChangeBackoff: 10000
 ```
 
 Navigating the CLI
@@ -253,6 +264,8 @@ Usage: add <id> [options]
         CPUs for server. Optional.
   -m <value> | --mem <value>
         Memory for server. Optional.
+  -b <value> | --configchangebackoff <value>
+        Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
 ```

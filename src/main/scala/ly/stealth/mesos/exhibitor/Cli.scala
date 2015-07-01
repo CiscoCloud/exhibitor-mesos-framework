@@ -84,6 +84,8 @@ object Cli {
 
         Config.master = config("master")
         Config.user = config("user")
+        config.get("ensemblemodifyretries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
+        config.get("ensemblemodifybackoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
@@ -265,6 +267,7 @@ object Cli {
     }
     printLine(s"cpu: ${config.cpus}", indent)
     printLine(s"mem: ${config.mem}", indent)
+    printLine(s"sharedConfigChangeBackoff: ${config.sharedConfigChangeBackoff}", indent)
   }
 
   private object Parsers {
@@ -281,6 +284,14 @@ object Cli {
         config.updated("user", value)
       }
 
+      opt[Int]("ensemblemodifyretries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
+        config.updated("ensemblemodifyretries", value.toString)
+      }
+
+      opt[Long]("ensemblemodifybackoff").optional().text("Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.").action { (value, config) =>
+        config.updated("ensemblemodifybackoff", value.toString)
+      }
+
       opt[Boolean]('d', "debug").optional().text("Debug mode. Optional. Defaults to false.").action { (value, config) =>
         config.updated("debug", value.toString)
       }
@@ -293,6 +304,10 @@ object Cli {
 
       opt[String]('m', "mem").optional().text("Memory for server. Optional.").action { (value, config) =>
         config.updated("mem", value)
+      }
+
+      opt[Long]('b', "configchangebackoff").optional().text("Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.").action { (value, config) =>
+        config.updated("configchangebackoff", value.toString)
       }
 
       opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>

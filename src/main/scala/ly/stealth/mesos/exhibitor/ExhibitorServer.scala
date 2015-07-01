@@ -26,16 +26,17 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 
 import scala.collection.mutable
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var cpus: Double = 0.2, var mem: Double = 256)
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256)
 
 object TaskConfig {
-  def apply(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, hostname: String): TaskConfig = new TaskConfig(exhibitorConfig, sharedConfigOverride, id, hostname)
-
   implicit val reader = (
     (__ \ 'exhibitorConfig).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
       (__ \ 'sharedConfigOverride).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
       (__ \ 'id).read[String] and
-      (__ \ 'hostname).read[String])(TaskConfig.apply _)
+      (__ \ 'hostname).read[String] and
+      (__ \ 'sharedConfigChangeBackoff).read[Long] and
+      (__ \ 'cpu).read[Double] and
+      (__ \ 'mem).read[Double])(TaskConfig.apply _)
 
   implicit val writer = new Writes[TaskConfig] {
     def writes(tc: TaskConfig): JsValue = {
@@ -45,7 +46,8 @@ object TaskConfig {
         "id" -> tc.id,
         "hostname" -> tc.hostname,
         "cpu" -> tc.cpus,
-        "mem" -> tc.mem
+        "mem" -> tc.mem,
+        "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff
       )
     }
   }
@@ -158,6 +160,7 @@ object ExhibitorServer {
     config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
     server.config.cpus = config.cpus
     server.config.mem = config.mem
+    server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
     server.config.hostname = config.hostname
     server
   })

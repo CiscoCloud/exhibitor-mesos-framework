@@ -161,9 +161,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private def addToEnsemble(server: ExhibitorServer) {
-    val retries = 60 //TODO this should probably be configurable
-
-    def tryAddToEnsemble(retriesLeft: Int, backoffMs: Long) {
+    def tryAddToEnsemble(retriesLeft: Int) {
       val sharedConfig = getSharedConfig(server, retriesLeft)
 
       val updatedSharedConfig = server.config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
@@ -188,19 +186,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
           if (retriesLeft > 0) {
             logger.debug("Retrying...")
-            Thread.sleep(backoffMs)
-            tryAddToEnsemble(retries - 1, backoffMs)
-          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after $retries retries")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryAddToEnsemble(retriesLeft - 1)
+          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries")
       }
     }
 
-    tryAddToEnsemble(retries, 1000)
+    tryAddToEnsemble(Config.ensembleModifyRetries)
   }
 
   private def removeFromEnsemble(server: ExhibitorServer) {
-    val retries = 60 //TODO this should probably be configurable
-
-    def tryRemoveFromEnsemble(aliveServer: ExhibitorServer, retriesLeft: Int, backoffMs: Long) {
+    def tryRemoveFromEnsemble(aliveServer: ExhibitorServer, retriesLeft: Int) {
       val sharedConfig = getSharedConfig(aliveServer, retriesLeft)
 
       val updatedServersSpec = sharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
@@ -217,14 +213,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
           if (retriesLeft > 0) {
             logger.debug("Retrying...")
-            Thread.sleep(backoffMs)
-            tryRemoveFromEnsemble(aliveServer, retries - 1, backoffMs)
-          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after $retries retries")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryRemoveFromEnsemble(aliveServer, retriesLeft - 1)
+          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries")
       }
     }
 
     cluster.servers.find(_.state == ExhibitorServer.Running) match {
-      case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, retries, 1000)
+      case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
       case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
     }
   }

@@ -28,6 +28,9 @@ object Config {
 
   var api: String = null
 
+  var ensembleModifyRetries: Int = 60
+  var ensembleModifyBackoff: Long = 1000
+
   def httpServerPort: Int = {
     val port = new URI(api).getPort
     if (port == -1) 80 else port

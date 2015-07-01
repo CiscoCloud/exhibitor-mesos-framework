@@ -82,10 +82,10 @@ class Exhibitor {
     new Thread {
       override def run() {
         while (isStarted) {
-          val config = ExhibitorAPI.getSystemState(url)
-          if (config != sharedConfig) {
+          val newConfig = ExhibitorAPI.getSystemState(url)
+          if (newConfig != sharedConfig) {
             logger.debug("Shared configuration changed, applying changes")
-            sharedConfig = config
+            sharedConfig = newConfig
 
             if (sharedConfig.zookeeperInstallDirectory != "") {
               new File(sharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
@@ -93,7 +93,7 @@ class Exhibitor {
             }
           }
 
-          Thread.sleep(10000) //TODO this should be configurable
+          Thread.sleep(config.sharedConfigChangeBackoff)
         }
       }
     }.start()
@@ -109,9 +109,9 @@ class Exhibitor {
 }
 
 object Exhibitor {
-  private lazy val loader = init
+  private lazy val loader = initLoader
 
-  private def init: ClassLoader = {
+  private def initLoader: ClassLoader = {
     new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask)) match {
       case None => throw new IllegalStateException("Exhibitor standalone jar not found")
       case Some(exhibitorDist) => URLClassLoader.newInstance(Array(exhibitorDist.toURI.toURL), getClass.getClassLoader)
