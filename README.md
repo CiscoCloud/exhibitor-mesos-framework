@@ -260,7 +260,7 @@ Usage: add <id> [options]
 Configuring servers in the cluster
 ----------------------
 
-**NOTE**: this section is far from being final and more configurations will appear soon. Please don't panic if something is missing, it will be added soon.
+**NOTE**: this section is not final some configurations will change.
 
 ```
 # ./exhibitor-mesos.sh help config
@@ -270,10 +270,26 @@ Usage: config <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   --configtype <value>
         Config type to use: s3 or zookeeper. Optional.
-  --zkconfigconnect <value>
-        The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.
-  --zkconfigzpath <value>
-        The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.
+  --configcheckms <value>
+        Period (ms) to check for shared config updates. Optional.
+  --defaultconfig <value>
+        Full path to a file that contains initial/default values for Exhibitor/ZooKeeper config values. The file is a standard property file. Optional.
+  --headingtext <value>
+        Extra text to display in UI header. Optional.
+  --hostname <value>
+        Hostname to use for this JVM. Optional.
+  --jquerystyle <value>
+        Styling used for the JQuery-based UI. Optional.
+  --loglines <value>
+        Max lines of logging to keep in memory for display. Default is 1000. Optional.
+  --nodemodification <value>
+        If true, the Explorer UI will allow nodes to be modified (use with caution). Default is true. Optional.
+  --prefspath <value>
+        Certain values (such as Control Panel values) are stored in a preferences file. By default, Preferences.userRoot() is used. Optional.
+  --servo <value>
+        true/false (default is false). If enabled, ZooKeeper will be queried once a minute for its state via the 'mntr' four letter word (this requires ZooKeeper 3.4.x+). Servo will be used to publish this data via JMX. Optional.
+  --timeout <value>
+        Connection timeout (ms) for ZK connections. Default is 30000. Optional.
   --s3credentials <value>
         Credentials to use for s3backup or s3config. Optional.
   --s3region <value>
@@ -282,10 +298,60 @@ Usage: config <id> [options]
         The bucket name and key to store the config (s3credentials may be provided as well). Argument is [bucket name]:[key]. Optional.
   --s3configprefix <value>
         When using AWS S3 shared config files, the prefix to use for values such as locks. Optional.
+  --zkconfigconnect <value>
+        The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.
+  --zkconfigexhibitorpath <value>
+        Used if the ZooKeeper shared config is also running Exhibitor. This is the URI path for the REST call. The default is: /. Optional.
+  --zkconfigexhibitorport <value>
+        Used if the ZooKeeper shared config is also running Exhibitor. This is the port that Exhibitor is listening on. IMPORTANT: if this value is not set it implies that Exhibitor is not being used on the ZooKeeper shared config. Optional.
+  --zkconfigpollms <value>
+        The period in ms to check for changes in the config ensemble. The default is: 10000. Optional.
+  --zkconfigretry <value>
+        The retry values to use in the form sleep-ms:retry-qty. The default is: 1000:3. Optional.
+  --zkconfigzpath <value>
+        The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.
+  --filesystembackup <value>
+        If true, enables file system backup of ZooKeeper log files. Optional.
+  --s3backup <value>
+        If true, enables AWS S3 backup of ZooKeeper log files (s3credentials may be provided as well). Optional.
+  --aclid <value>
+        Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's ID. Optional.
+  --aclperms <value>
+        Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Permissions - a comma list of possible permissions. If this isn't specified the permission is set to ALL. Values: read, write, create, delete, admin. Optional.
+  --aclscheme <value>
+        Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Scheme. Optional.
+  --log-index-directory <value>
+        The directory where indexed Zookeeper logs should be kept. Optional.
   --zookeeper-install-directory <value>
-        Zookeeper install directory shared config. Optional.
+        The directory where the Zookeeper server is installed. Optional.
   --zookeeper-data-directory <value>
-        Zookeeper data directory shared config. Optional.
+        The directory where Zookeeper snapshot data is stored. Optional.
+  --zookeeper-log-directory <value>
+        The directory where Zookeeper transaction log data is stored. Optional.
+  --backup-extra <value>
+        Backup extra shared config. Optional.
+  --zoo-cfg-extra <value>
+        Any additional properties to be added to the zoo.cfg file in form: key1\\=value1&key2\\=value2. Optional.
+  --java-environment <value>
+        Script to write as the 'java.env' file which gets executed as a part of Zookeeper start script. Optional.
+  --log4j-properties <value>
+        Contents of the log4j.properties file. Optional.
+  --client-port <value>
+        The port that clients use to connect to Zookeeper. Defaults to 2181. Optional.
+  --connect-port <value>
+        The port that other Zookeeper instances use to connect to Zookeeper. Defaults to 2888. Optional.
+  --election-port <value>
+        The port that other Zookeeper instances use for election. Defaults to 3888. Optional.
+  --check-ms <value>
+        The number of milliseconds between live-ness checks on Zookeeper server. Defaults to 30000. Optional.
+  --cleanup-period-ms <value>
+        The number of milliseconds between Zookeeper log file cleanups. Defaults to 43200000. Optional.
+  --cleanup-max-files <value>
+        The max number of Zookeeper log files to keep when cleaning up. Defaults to 3. Optional.
+  --backup-max-store-ms <value>
+        Backup max store ms shared config. Optional.
+  --backup-period-ms <value>
+        Backup period ms shared config. Optional.
 ```
 
 Starting servers in the cluster

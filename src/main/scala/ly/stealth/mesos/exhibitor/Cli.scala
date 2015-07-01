@@ -313,18 +313,52 @@ object Cli {
         config.updated("api", value)
       }
 
+      // Exhibitor configs
       opt[String]("configtype").optional().text("Config type to use: s3 or zookeeper. Optional.").action { (value, config) =>
         config.updated("configtype", value)
       }
 
-      opt[String]("zkconfigconnect").optional().text("The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.").action { (value, config) =>
-        config.updated("zkconfigconnect", value)
+      opt[String]("configcheckms").optional().text("Period (ms) to check for shared config updates. Optional.").action { (value, config) =>
+        config.updated("configcheckms", value)
       }
 
-      opt[String]("zkconfigzpath").optional().text("The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.").action { (value, config) =>
-        config.updated("zkconfigzpath", value)
+      opt[String]("defaultconfig").optional().text("Full path to a file that contains initial/default values for Exhibitor/ZooKeeper config values. The file is a standard property file. Optional.").action { (value, config) =>
+        config.updated("defaultconfig", value)
       }
 
+      opt[String]("headingtext").optional().text("Extra text to display in UI header. Optional.").action { (value, config) =>
+        config.updated("headingtext", value)
+      }
+
+      opt[String]("hostname").optional().text("Hostname to use for this JVM. Optional.").action { (value, config) =>
+        config.updated("hostname", value)
+      }
+
+      opt[String]("jquerystyle").optional().text("Styling used for the JQuery-based UI. Optional.").action { (value, config) =>
+        config.updated("jquerystyle", value)
+      }
+
+      opt[String]("loglines").optional().text("Max lines of logging to keep in memory for display. Default is 1000. Optional.").action { (value, config) =>
+        config.updated("loglines", value)
+      }
+
+      opt[String]("nodemodification").optional().text("If true, the Explorer UI will allow nodes to be modified (use with caution). Default is true. Optional.").action { (value, config) =>
+        config.updated("nodemodification", value)
+      }
+
+      opt[String]("prefspath").optional().text("Certain values (such as Control Panel values) are stored in a preferences file. By default, Preferences.userRoot() is used. Optional.").action { (value, config) =>
+        config.updated("prefspath", value)
+      }
+
+      opt[String]("servo").optional().text("true/false (default is false). If enabled, ZooKeeper will be queried once a minute for its state via the 'mntr' four letter word (this requires ZooKeeper 3.4.x+). Servo will be used to publish this data via JMX. Optional.").action { (value, config) =>
+        config.updated("servo", value)
+      }
+
+      opt[String]("timeout").optional().text("Connection timeout (ms) for ZK connections. Default is 30000. Optional.").action { (value, config) =>
+        config.updated("timeout", value)
+      }
+
+      // S3 options
       opt[String]("s3credentials").optional().text("Credentials to use for s3backup or s3config. Optional.").action { (value, config) =>
         config.updated("s3credentials", value)
       }
@@ -333,6 +367,7 @@ object Cli {
         config.updated("s3region", value)
       }
 
+      // Configuration Options for Type "s3"
       opt[String]("s3config").optional().text("The bucket name and key to store the config (s3credentials may be provided as well). Argument is [bucket name]:[key]. Optional.").action { (value, config) =>
         config.updated("s3config", value)
       }
@@ -341,13 +376,116 @@ object Cli {
         config.updated("s3configprefix", value)
       }
 
+      // Configuration Options for Type "zookeeper"
+      opt[String]("zkconfigconnect").optional().text("The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.").action { (value, config) =>
+        config.updated("zkconfigconnect", value)
+      }
+
+      opt[String]("zkconfigexhibitorpath").optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the URI path for the REST call. The default is: /. Optional.").action { (value, config) =>
+        config.updated("zkconfigexhibitorpath", value)
+      }
+
+      opt[String]("zkconfigexhibitorport").optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the port that Exhibitor is listening on. IMPORTANT: if this value is not set it implies that Exhibitor is not being used on the ZooKeeper shared config. Optional.").action { (value, config) =>
+        config.updated("zkconfigexhibitorport", value)
+      }
+
+      opt[String]("zkconfigpollms").optional().text("The period in ms to check for changes in the config ensemble. The default is: 10000. Optional.").action { (value, config) =>
+        config.updated("zkconfigpollms", value)
+      }
+
+      opt[String]("zkconfigretry").optional().text("The retry values to use in the form sleep-ms:retry-qty. The default is: 1000:3. Optional.").action { (value, config) =>
+        config.updated("zkconfigretry", value)
+      }
+
+      opt[String]("zkconfigzpath").optional().text("The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.").action { (value, config) =>
+        config.updated("zkconfigzpath", value)
+      }
+
+      // Backup Options
+      opt[String]("filesystembackup").optional().text("If true, enables file system backup of ZooKeeper log files. Optional.").action { (value, config) =>
+        config.updated("filesystembackup", value)
+      }
+
+      opt[String]("s3backup").optional().text("If true, enables AWS S3 backup of ZooKeeper log files (s3credentials may be provided as well). Optional.").action { (value, config) =>
+        config.updated("s3backup", value)
+      }
+
+      // ACL Options
+      opt[String]("aclid").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's ID. Optional.").action { (value, config) =>
+        config.updated("aclid", value)
+      }
+
+      opt[String]("aclperms").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Permissions - a comma list of possible permissions. If this isn't specified the permission is set to ALL. Values: read, write, create, delete, admin. Optional.").action { (value, config) =>
+        config.updated("aclperms", value)
+      }
+
+      opt[String]("aclscheme").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Scheme. Optional.").action { (value, config) =>
+        config.updated("aclscheme", value)
+      }
+
       // shared configs
-      opt[String]("zookeeper-install-directory").optional().text("Zookeeper install directory shared config. Optional.").action { (value, config) =>
+      opt[String]("log-index-directory").optional().text("The directory where indexed Zookeeper logs should be kept. Optional.").action { (value, config) =>
+        config.updated("log-index-directory", value)
+      }
+
+      opt[String]("zookeeper-install-directory").optional().text("The directory where the Zookeeper server is installed. Optional.").action { (value, config) =>
         config.updated("zookeeper-install-directory", value)
       }
 
-      opt[String]("zookeeper-data-directory").optional().text("Zookeeper data directory shared config. Optional.").action { (value, config) =>
+      opt[String]("zookeeper-data-directory").optional().text("The directory where Zookeeper snapshot data is stored. Optional.").action { (value, config) =>
         config.updated("zookeeper-data-directory", value)
+      }
+
+      opt[String]("zookeeper-log-directory").optional().text("The directory where Zookeeper transaction log data is stored. Optional.").action { (value, config) =>
+        config.updated("zookeeper-log-directory", value)
+      }
+
+      opt[String]("backup-extra").optional().text("Backup extra shared config. Optional.").action { (value, config) =>
+        config.updated("backup-extra", value)
+      }
+
+      opt[String]("zoo-cfg-extra").optional().text("Any additional properties to be added to the zoo.cfg file in form: key1\\\\=value1&key2\\\\=value2. Optional.").action { (value, config) =>
+        config.updated("zoo-cfg-extra", value)
+      }
+
+      opt[String]("java-environment").optional().text("Script to write as the 'java.env' file which gets executed as a part of Zookeeper start script. Optional.").action { (value, config) =>
+        config.updated("java-environment", value)
+      }
+
+      opt[String]("log4j-properties").optional().text("Contents of the log4j.properties file. Optional.").action { (value, config) =>
+        config.updated("log4j-properties", value)
+      }
+
+      opt[String]("client-port").optional().text("The port that clients use to connect to Zookeeper. Defaults to 2181. Optional.").action { (value, config) =>
+        config.updated("client-port", value)
+      }
+
+      opt[String]("connect-port").optional().text("The port that other Zookeeper instances use to connect to Zookeeper. Defaults to 2888. Optional.").action { (value, config) =>
+        config.updated("connect-port", value)
+      }
+
+      opt[String]("election-port").optional().text("The port that other Zookeeper instances use for election. Defaults to 3888. Optional.").action { (value, config) =>
+        config.updated("election-port", value)
+      }
+
+      opt[String]("check-ms").optional().text("The number of milliseconds between live-ness checks on Zookeeper server. Defaults to 30000. Optional.").action { (value, config) =>
+        config.updated("check-ms", value)
+      }
+
+      opt[String]("cleanup-period-ms").optional().text("The number of milliseconds between Zookeeper log file cleanups. Defaults to 43200000. Optional.").action { (value, config) =>
+        config.updated("cleanup-period-ms", value)
+      }
+
+      opt[String]("cleanup-max-files").optional().text("The max number of Zookeeper log files to keep when cleaning up. Defaults to 3. Optional.").action { (value, config) =>
+        config.updated("cleanup-max-files", value)
+      }
+
+      opt[String]("backup-max-store-ms").optional().text("Backup max store ms shared config. Optional.").action { (value, config) =>
+        config.updated("backup-max-store-ms", value)
+      }
+
+      opt[String]("backup-period-ms").optional().text("Backup period ms shared config. Optional.").action { (value, config) =>
+        config.updated("backup-period-ms", value)
       }
     }
 
