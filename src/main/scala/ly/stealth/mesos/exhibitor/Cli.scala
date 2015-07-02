@@ -240,6 +240,14 @@ object Cli {
     printLine("remove     - remove servers in cluster.", 1)
   }
 
+  private def printConstraintExamples() {
+    printLine("constraint examples:")
+    printLine("like:slave0   - value equals 'slave0'", 1)
+    printLine("unlike:slave0 - value is not equal to 'slave0'", 1)
+    printLine("like:slave.*  - value starts with 'slave'", 1)
+    printLine("unique        - all values are unique", 1)
+  }
+
   private def printCluster(cluster: List[ExhibitorServer]) {
     printLine("cluster:")
     cluster.foreach(printExhibitorServer(_, 1))
@@ -252,6 +260,8 @@ object Cli {
     if (!server.config.hostname.isEmpty && server.config.exhibitorConfig.get("port").isDefined) {
       printLine(s"endpoint: ${server.url}/exhibitor/v1/ui/index.html", indent + 1)
     }
+    if (server.constraints.nonEmpty)
+      printLine(s"constraints: ${Util.formatMap(server.constraints)}", indent + 1)
     printTaskConfig(server.config, indent + 1)
     printLine()
   }
@@ -298,12 +308,22 @@ object Cli {
     }
 
     val add = new OptionParser[Map[String, String]]("add <id>") {
+      override def showUsage {
+        super.showUsage
+        printLine()
+        printConstraintExamples()
+      }
+
       opt[String]('c', "cpu").optional().text(s"CPUs for server. Optional.").action { (value, config) =>
         config.updated("cpu", value)
       }
 
       opt[String]('m', "mem").optional().text("Memory for server. Optional.").action { (value, config) =>
         config.updated("mem", value)
+      }
+
+      opt[String]("constraints").optional().text("Constraints (hostname=like:master,rack=like:1.*). See below. Defaults to 'hostname=unique'. Optional.").action { (value, config) =>
+        config.updated("constraints", value)
       }
 
       opt[Long]('b', "configchangebackoff").optional().text("Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.").action { (value, config) =>

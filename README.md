@@ -107,6 +107,7 @@ Server added
 server:
   id: 0
   state: Added
+  constraints: hostname=unique
   exhibitor config:
   shared config overrides:
   cpu: 0.2
@@ -122,6 +123,7 @@ cluster:
   server:
     id: 0
     state: Added
+    constraints: hostname=unique
     exhibitor config:
     shared config overrides:
     cpu: 0.2
@@ -136,6 +138,7 @@ Each server requires some basic configuration.
 server:
   id: 0
   state: Added
+  constraints: hostname=unique
   exhibitor config:
     zkconfigzpath: /exhibitor/config
     zkconfigconnect: 192.168.3.1:2181
@@ -157,6 +160,7 @@ Started server
 server:
   id: 0
   state: Stopped
+  constraints: hostname=unique
   exhibitor config:
     zkconfigzpath: /exhibitor/config
     zkconfigconnect: 192.168.3.1:2181
@@ -177,7 +181,8 @@ cluster:
   server:
     id: 0
     state: Running
-    endpoint: http://slave0:31000/exhibitor/v1/ui/index.html
+    endpoint: http://slave1:31000/exhibitor/v1/ui/index.html
+    constraints: hostname=unique
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -219,9 +224,11 @@ Stopped server 0
 server:
   id: 0
   state: Added
+  constraints: hostname=unique
   exhibitor config:
     zkconfigzpath: /exhibitor/config
     zkconfigconnect: 192.168.3.1:2181
+    port: 31000
     configtype: zookeeper
   shared config overrides:
     zookeeper-install-directory: /tmp/zookeeper
@@ -264,10 +271,18 @@ Usage: add <id> [options]
         CPUs for server. Optional.
   -m <value> | --mem <value>
         Memory for server. Optional.
+  --constraints <value>
+        Constraints (hostname=like:master,rack=like:1.*). See below. Defaults to 'hostname=unique'. Optional.
   -b <value> | --configchangebackoff <value>
         Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
+
+constraint examples:
+  like:slave0   - value equals 'slave0'
+  unlike:slave0 - value is not equal to 'slave0'
+  like:slave.*  - value starts with 'slave'
+  unique        - all values are unique
 ```
 
 Configuring servers in the cluster

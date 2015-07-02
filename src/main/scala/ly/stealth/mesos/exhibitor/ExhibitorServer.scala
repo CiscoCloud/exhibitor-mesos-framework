@@ -24,6 +24,7 @@ import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsValue, Json, Writes, _}
 
+import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256)
@@ -54,34 +55,58 @@ object TaskConfig {
 }
 
 case class ExhibitorServer(id: String) {
-  private[exhibitor] var taskId: TaskID = null
+  private[exhibitor] var task: ExhibitorServer.Task = null
 
   val config = TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), id)
 
+  private[exhibitor] val constraints: mutable.Map[String, Constraint] = new mutable.HashMap[String, Constraint]
   private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Added
 
-  def createTask(offer: Offer): Option[TaskInfo] = {
-    val cpus = Util.getScalarResources(offer, "cpus")
-    val mem = Util.getScalarResources(offer, "mem")
-    val portOpt = getPort(offer)
+  def createTask(offer: Offer): TaskInfo = {
+    val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
 
-    // TODO replace with constraints
-    if (cpus > this.config.cpus && mem > this.config.mem && portOpt.nonEmpty && Scheduler.cluster.servers.find(_.config.hostname == offer.getHostname).isEmpty) {
-      val id = s"exhibitor-${this.id}-${offer.getHostname}-${portOpt.get}"
-      this.config.exhibitorConfig.put("port", portOpt.get.toString)
-      this.config.hostname = offer.getHostname
-      val taskId = TaskID.newBuilder().setValue(id).build
-      val taskInfo = TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-        .setExecutor(newExecutor(id))
-        .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
-        .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
-        .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
-        .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
-        Protos.Value.Ranges.newBuilder().addRange(Protos.Value.Range.newBuilder().setBegin(portOpt.get).setEnd(portOpt.get))
-      )).build
+    val id = s"exhibitor-${this.id}-${offer.getHostname}-$port"
+    this.config.exhibitorConfig.put("port", port.toString)
+    this.config.hostname = offer.getHostname
+    val taskId = TaskID.newBuilder().setValue(id).build
+    TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
+      .setExecutor(newExecutor(id))
+      .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
+      .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
+      .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
+      .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
+      Protos.Value.Ranges.newBuilder().addRange(Protos.Value.Range.newBuilder().setBegin(port).setEnd(port))
+    )).build
+  }
 
-      Some(taskInfo)
-    } else None
+  def matches(offer: Offer, otherAttributes: String => List[String]): Option[String] = {
+    val offerResources = offer.getResourcesList.toList.map(res => res.getName -> res).toMap
+
+    if (getPort(offer).isEmpty) return Some("no suitable port")
+
+    offerResources.get("cpus") match {
+      case Some(cpusResource) => if (cpusResource.getScalar.getValue < config.cpus) return Some(s"cpus ${cpusResource.getScalar.getValue} < ${config.cpus}")
+      case None => return Some("no cpus")
+    }
+
+    offerResources.get("mem") match {
+      case Some(memResource) => if (memResource.getScalar.getValue < config.mem) return Some(s"mem ${memResource.getScalar.getValue} < ${config.mem}")
+      case None => return Some("no mem")
+    }
+
+    val offerAttributes = offer.getAttributesList.toList.foldLeft(Map("hostname" -> offer.getHostname)) { case (attributes, attribute) =>
+      if (attribute.hasText) attributes.updated(attribute.getName, attribute.getText.getValue)
+      else attributes
+    }
+
+    for ((name, constraint) <- constraints) {
+      offerAttributes.get(name) match {
+        case Some(attribute) => if (!constraint.matches(attribute, otherAttributes(name))) return Some(s"$name doesn't match $constraint")
+        case None => return Some(s"no $name")
+      }
+    }
+
+    None
   }
 
   private def newExecutor(id: String): ExecutorInfo = {
@@ -139,6 +164,7 @@ object ExhibitorServer {
       Json.obj(
         "id" -> es.id,
         "state" -> es.state.toString,
+        "constraints" -> Util.formatMap(es.constraints),
         "config" -> es.config
       )
     }
@@ -147,7 +173,8 @@ object ExhibitorServer {
   implicit val reader = (
     (__ \ 'id).read[String] and
       (__ \ 'state).read[String] and
-      (__ \ 'config).read[TaskConfig])((id, state, config) => {
+      (__ \ 'constraints).read[String].map(Util.parseMap(_).mapValues(Constraint(_))) and
+      (__ \ 'config).read[TaskConfig])((id, state, constraints, config) => {
     val server = ExhibitorServer(id)
     state match {
       case "Unknown" => server.state = Unknown
@@ -156,6 +183,7 @@ object ExhibitorServer {
       case "Staging" => server.state = Staging
       case "Running" => server.state = Running
     }
+    constraints.foreach(server.constraints += _)
     config.exhibitorConfig.foreach(server.config.exhibitorConfig += _)
     config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
     server.config.cpus = config.cpus
@@ -164,4 +192,7 @@ object ExhibitorServer {
     server.config.hostname = config.hostname
     server
   })
+
+  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String])
+
 }

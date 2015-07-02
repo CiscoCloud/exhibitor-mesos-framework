@@ -132,11 +132,13 @@ object HttpServer {
       val id = request.getParameter("id")
       val cpus = Option(request.getParameter("cpu"))
       val mem = Option(request.getParameter("mem"))
+      val constraints = Option(request.getParameter("constraints"))
       val backoff = Option(request.getParameter("configchangebackoff"))
 
       val server = ExhibitorServer(id)
       cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
       mem.foreach(mem => server.config.mem = mem.toDouble)
+      server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
       backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
 
       Scheduler.cluster.servers += server

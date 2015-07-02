@@ -27,9 +27,10 @@ import org.apache.mesos.Protos
 import org.apache.mesos.Protos._
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 object Util {
-  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): util.Map[String, String] = {
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): Map[String, String] = {
     def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
       val parts = new util.ArrayList[String]()
 
@@ -53,8 +54,8 @@ object Util {
       parts.toArray(Array[String]())
     }
 
-    val result = new util.LinkedHashMap[String, String]()
-    if (s == null) return result
+    val result = new mutable.HashMap[String, String]()
+    if (s == null) return result.toMap
 
     for (entry <- splitEscaped(s, entrySep)) {
       if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
@@ -67,7 +68,29 @@ object Util {
       result.put(key, value)
     }
 
-    result
+    result.toMap
+  }
+
+  def formatMap(map: collection.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
+    def escape(s: String): String = {
+      var result = ""
+
+      for (c <- s.toCharArray) {
+        if (c == entrySep || c == valueSep || c == '\\') result += "\\"
+        result += c
+      }
+
+      result
+    }
+
+    var s = ""
+    for ((k, v) <- map) {
+      if (!s.isEmpty) s += entrySep
+      s += escape(k)
+      if (v != null) s += valueSep + escape("" + v)
+    }
+
+    s
   }
 
   object Str {

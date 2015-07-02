@@ -82,26 +82,49 @@ object Scheduler extends org.apache.mesos.Scheduler {
   override def resourceOffers(driver: SchedulerDriver, offers: util.List[Offer]) {
     logger.debug("[resourceOffers]\n" + Str.offers(offers))
 
-    offers.foreach { offer =>
-      cluster.servers.find(_.state == ExhibitorServer.Stopped) match {
-        case Some(server) =>
-          server.createTask(offer) match {
-            case Some(taskInfo) =>
-              server.state = ExhibitorServer.Staging
-              server.taskId = taskInfo.getTaskId
-              driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(taskInfo), Filters.newBuilder().setRefuseSeconds(1).build)
-            case None =>
-              logger.warn(s"Host ${offer.getHostname} lacks resources for a task to be launched")
-              driver.declineOffer(offer.getId)
-          }
-        case None =>
-          driver.declineOffer(offer.getId)
-      }
-    }
+    onResourceOffers(offers.toList)
   }
 
   override def executorLost(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, status: Int) {
     logger.info("[executorLost] executor:" + Str.id(executorId.getValue) + " slave:" + Str.id(slaveId.getValue) + " status:" + status)
+  }
+
+  private def onResourceOffers(offers: List[Offer]) {
+    offers.foreach { offer =>
+      acceptOffer(offer).foreach { declineReason =>
+        driver.declineOffer(offer.getId)
+        logger.info(s"Declined offer:\n  $declineReason")
+      }
+    }
+  }
+
+  private def acceptOffer(offer: Offer): Option[String] = {
+    cluster.servers.filter(_.state == ExhibitorServer.Stopped).toList match {
+      case Nil => Some("all servers are running")
+      case servers =>
+        val reason = servers.flatMap { server =>
+          server.matches(offer, otherTasksAttributes) match {
+            case Some(declineReason) => Some(s"server ${server.id}: $declineReason")
+            case None =>
+              launchTask(server, offer)
+              return None
+          }
+        }.mkString(", ")
+
+        if (reason.isEmpty) None else Some(reason)
+    }
+  }
+
+  private def launchTask(server: ExhibitorServer, offer: Offer) {
+    val task = server.createTask(offer)
+    val taskId = task.getTaskId.getValue
+    val attributes = offer.getAttributesList.toList.filter(_.hasText).map(attr => attr.getName -> attr.getText.getValue).toMap
+
+    server.task = ExhibitorServer.Task(taskId, task.getSlaveId.getValue, task.getExecutor.getExecutorId.getValue, attributes)
+    server.state = ExhibitorServer.Staging
+    driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task), Filters.newBuilder().setRefuseSeconds(1).build)
+
+    logger.info(s"Starting server ${server.id}: launching task $taskId for offer ${offer.getId.getValue}")
   }
 
   private def onServerStatus(driver: SchedulerDriver, status: TaskStatus) {
@@ -143,7 +166,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
-      driver.killTask(server.taskId)
+      driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
       server.state = ExhibitorServer.Added
       server
     }
@@ -248,6 +271,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     tryGetConfig(retries, 1000)
+  }
+
+  private[exhibitor] def otherTasksAttributes(name: String): List[String] = {
+    def value(server: ExhibitorServer, name: String): Option[String] = {
+      if (name == "hostname") Option(server.config.hostname)
+      else server.task.attributes.get(name)
+    }
+
+    cluster.servers.filter(_.task != null).flatMap(value(_, name)).toList
   }
 
   private def initLogging() {
