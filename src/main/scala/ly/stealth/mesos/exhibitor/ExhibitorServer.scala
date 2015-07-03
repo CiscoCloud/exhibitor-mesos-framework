@@ -79,7 +79,7 @@ case class ExhibitorServer(id: String) {
     )).build
   }
 
-  def matches(offer: Offer, otherAttributes: String => List[String]): Option[String] = {
+  def matches(offer: Offer, otherAttributes: String => List[String] = _ => Nil): Option[String] = {
     val offerResources = offer.getResourcesList.toList.map(res => res.getName -> res).toMap
 
     if (getPort(offer).isEmpty) return Some("no suitable port")

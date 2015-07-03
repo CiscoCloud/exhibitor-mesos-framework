@@ -18,7 +18,7 @@
 
 package ly.stealth.mesos.exhibitor
 
-import java.io.IOException
+import java.io.{IOException, PrintStream}
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
 import play.api.libs.json.{JsValue, Json}
@@ -27,11 +27,13 @@ import scopt.OptionParser
 import scala.io.Source
 
 object Cli {
+  private[exhibitor] var out: PrintStream = System.out
+
   def main(args: Array[String]) {
     try {
       exec(args)
     } catch {
-      case e: Throwable =>
+      case e: CliError =>
         System.err.println("Error: " + e.getMessage)
         sys.exit(1)
     }
@@ -40,8 +42,8 @@ object Cli {
   def exec(args: Array[String]) {
     if (args.length == 0) {
       handleHelp()
-      println()
-      throw new RuntimeException("No command supplied")
+      printLine()
+      throw CliError("No command supplied")
     }
 
     val command = args.head
@@ -56,13 +58,14 @@ object Cli {
       case "remove" => handleRemove(commandArgs)
       case "status" => handleStatus(commandArgs)
       case "config" => handleConfig(commandArgs)
+      case _ => throw CliError(s"Unknown command: $command\n")
     }
   }
 
   def handleHelp(command: String = "") {
     command match {
       case "" =>
-        println("Usage: <command>\n")
+        printLine("Usage: <command>\n")
         printGenericHelp()
       case "scheduler" => Parsers.scheduler.showUsage
       case "add" => Parsers.add.showUsage
@@ -72,7 +75,7 @@ object Cli {
       case "status" => Parsers.status.showUsage
       case "config" => Parsers.config.showUsage
       case _ =>
-        println(s"Unknown command: $command\n")
+        printLine(s"Unknown command: $command\n")
         printGenericHelp()
     }
   }
@@ -89,7 +92,7 @@ object Cli {
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -103,7 +106,7 @@ object Cli {
         printLine("Server added")
         printLine()
         printExhibitorServer(server)
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -117,7 +120,7 @@ object Cli {
         printLine("Started server")
         printLine()
         printExhibitorServer(server)
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -129,7 +132,7 @@ object Cli {
 
         val server = sendRequest("/stop", config).as[ExhibitorServer]
         printLine(s"Stopped server ${server.id}")
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -141,7 +144,7 @@ object Cli {
 
         val server = sendRequest("/remove", config).as[ExhibitorServer]
         printLine(s"Removed server ${server.id}")
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -152,7 +155,7 @@ object Cli {
 
         val cluster = sendRequest("/status", config).as[List[ExhibitorServer]]
         printCluster(cluster)
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -164,7 +167,7 @@ object Cli {
 
         val server = sendRequest("/config", config).as[ExhibitorServer]
         printExhibitorServer(server)
-      case None => sys.exit(1)
+      case None => throw CliError("Invalid arguments")
     }
   }
 
@@ -173,7 +176,7 @@ object Cli {
       case Some(id) => id
       case None =>
         usage()
-        sys.exit(1)
+        throw CliError("Argument required")
     }
   }
 
@@ -190,7 +193,7 @@ object Cli {
       return
     }
 
-    throw new IllegalArgumentException("Undefined API url. Please provide either a CLI --api option or EM_API env.")
+    throw CliError("Undefined API url. Please provide either a CLI --api option or EM_API env.")
   }
 
   private[exhibitor] def sendRequest(uri: String, params: Map[String, String]): JsValue = {
@@ -225,7 +228,7 @@ object Cli {
     Json.parse(response)
   }
 
-  private def printLine(s: AnyRef = "", indent: Int = 0) = println("  " * indent + s)
+  private def printLine(s: AnyRef = "", indent: Int = 0) = out.println("  " * indent + s)
 
   private def printGenericHelp() {
     printLine("Commands:")
@@ -281,7 +284,7 @@ object Cli {
   }
 
   private object Parsers {
-    val scheduler = new OptionParser[Map[String, String]]("scheduler") {
+    val scheduler = new CliOptionParser("scheduler") {
       opt[String]('m', "master").required().text("Mesos Master addresses. Required.").action { (value, config) =>
         config.updated("master", value)
       }
@@ -307,7 +310,7 @@ object Cli {
       }
     }
 
-    val add = new OptionParser[Map[String, String]]("add <id>") {
+    val add = new CliOptionParser("add <id>") {
       override def showUsage {
         super.showUsage
         printLine()
@@ -343,7 +346,7 @@ object Cli {
 
     val status = defaultParser("status")
 
-    val config = new OptionParser[Map[String, String]]("config <id>") {
+    val config = new CliOptionParser("config <id>") {
       opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
         config.updated("api", value)
       }
@@ -524,11 +527,19 @@ object Cli {
       }
     }
 
-    private def defaultParser(descr: String): OptionParser[Map[String, String]] = new OptionParser[Map[String, String]](descr) {
+    private def defaultParser(descr: String): OptionParser[Map[String, String]] = new CliOptionParser(descr) {
       opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
         config.updated("api", value)
       }
     }
   }
+
+  class CliOptionParser(descr: String) extends OptionParser[Map[String, String]](descr) {
+    override def showUsage {
+      Cli.out.println(usage)
+    }
+  }
+
+  case class CliError(message: String) extends RuntimeException(message)
 
 }

@@ -28,7 +28,17 @@ import play.api.libs.json._
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
-class Exhibitor {
+trait IExhibitor {
+  def isStarted: Boolean
+
+  def start(config: TaskConfig)
+
+  def stop()
+
+  def await()
+}
+
+class Exhibitor extends IExhibitor {
   private val logger = Logger.getLogger(classOf[Exhibitor])
   @volatile var server: AnyRef = null
 

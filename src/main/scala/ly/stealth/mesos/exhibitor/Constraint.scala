@@ -21,7 +21,7 @@ package ly.stealth.mesos.exhibitor
 import java.util.regex.{Pattern, PatternSyntaxException}
 
 trait Constraint {
-  def matches(value: String, values: List[String]): Boolean
+  def matches(value: String, values: List[String] = Nil): Boolean
 }
 
 object Constraint {

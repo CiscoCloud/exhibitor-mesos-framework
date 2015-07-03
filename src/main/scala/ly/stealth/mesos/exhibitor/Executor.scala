@@ -28,7 +28,7 @@ import play.api.libs.json.Json
 
 object Executor extends org.apache.mesos.Executor {
   private val logger = Logger.getLogger(Executor.getClass)
-  private val exhibitor = new Exhibitor
+  private[exhibitor] var exhibitor: IExhibitor = new Exhibitor
 
   def main(args: Array[String]) {
     initLogging()
