@@ -32,7 +32,14 @@ object Constraint {
     else throw new IllegalArgumentException(s"Unsupported condition: $value")
   }
 
-  def parse(constraints: String): Map[String, Constraint] = Util.parseMap(constraints).mapValues(Constraint(_))
+  def parse(constraints: String): Map[String, List[Constraint]] = {
+    Util.parseList(constraints).foldLeft[Map[String, List[Constraint]]](Map()) { case (all, (name, value)) =>
+      all.get(name) match {
+        case Some(values) => all.updated(name, Constraint(value) :: values)
+        case None => all.updated(name, List(Constraint(value)))
+      }
+    }
+  }
 
   case class Like(regex: String, negated: Boolean = false) extends Constraint {
     val pattern = try {

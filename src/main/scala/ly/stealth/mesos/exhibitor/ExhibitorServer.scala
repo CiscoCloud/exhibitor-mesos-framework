@@ -59,7 +59,7 @@ case class ExhibitorServer(id: String) {
 
   val config = TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), id)
 
-  private[exhibitor] val constraints: mutable.Map[String, Constraint] = new mutable.HashMap[String, Constraint]
+  private[exhibitor] val constraints: mutable.Map[String, List[Constraint]] = new mutable.HashMap[String, List[Constraint]]
   private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Added
 
   def createTask(offer: Offer): TaskInfo = {
@@ -99,10 +99,12 @@ case class ExhibitorServer(id: String) {
       else attributes
     }
 
-    for ((name, constraint) <- constraints) {
-      offerAttributes.get(name) match {
-        case Some(attribute) => if (!constraint.matches(attribute, otherAttributes(name))) return Some(s"$name doesn't match $constraint")
-        case None => return Some(s"no $name")
+    for ((name, constraints) <- constraints) {
+      for (constraint <- constraints) {
+        offerAttributes.get(name) match {
+          case Some(attribute) => if (!constraint.matches(attribute, otherAttributes(name))) return Some(s"$name doesn't match $constraint")
+          case None => return Some(s"no $name")
+        }
       }
     }
 
@@ -164,7 +166,7 @@ object ExhibitorServer {
       Json.obj(
         "id" -> es.id,
         "state" -> es.state.toString,
-        "constraints" -> Util.formatMap(es.constraints),
+        "constraints" -> Util.formatConstraints(es.constraints),
         "config" -> es.config
       )
     }
@@ -173,7 +175,7 @@ object ExhibitorServer {
   implicit val reader = (
     (__ \ 'id).read[String] and
       (__ \ 'state).read[String] and
-      (__ \ 'constraints).read[String].map(Util.parseMap(_).mapValues(Constraint(_))) and
+      (__ \ 'constraints).read[String].map(Constraint.parse) and
       (__ \ 'config).read[TaskConfig])((id, state, constraints, config) => {
     val server = ExhibitorServer(id)
     state match {

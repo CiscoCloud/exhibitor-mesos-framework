@@ -264,7 +264,7 @@ object Cli {
       printLine(s"endpoint: ${server.url}/exhibitor/v1/ui/index.html", indent + 1)
     }
     if (server.constraints.nonEmpty)
-      printLine(s"constraints: ${Util.formatMap(server.constraints)}", indent + 1)
+      printLine(s"constraints: ${Util.formatConstraints(server.constraints)}", indent + 1)
     printTaskConfig(server.config, indent + 1)
     printLine()
   }

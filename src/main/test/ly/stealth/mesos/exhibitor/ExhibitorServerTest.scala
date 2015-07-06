@@ -61,36 +61,44 @@ class ExhibitorServerTest extends MesosTestCase {
 
     // like
     server.constraints.clear()
-    server.constraints += "hostname" -> Constraint("like:master")
+    server.constraints += "hostname" -> List(Constraint("like:master"))
     assertEquals(None, server.matches(offer(hostname = "master")))
     assertEquals(Some("hostname doesn't match like:master"), server.matches(offer(hostname = "slave0")))
 
     server.constraints.clear()
-    server.constraints += "hostname" -> Constraint("like:master.*")
+    server.constraints += "hostname" -> List(Constraint("like:master.*"))
     assertEquals(None, server.matches(offer(hostname = "master")))
     assertEquals(None, server.matches(offer(hostname = "master-2")))
     assertEquals(Some("hostname doesn't match like:master.*"), server.matches(offer(hostname = "slave0")))
 
     // unique
     server.constraints.clear()
-    server.constraints += "hostname" -> Constraint("unique")
+    server.constraints += "hostname" -> List(Constraint("unique"))
     assertEquals(None, server.matches(offer(hostname = "master")))
     assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "master"), _ => List("master")))
     assertEquals(None, server.matches(offer(hostname = "master"), _ => List("slave0")))
+
+    // multiple
+    server.constraints.clear()
+    server.constraints += "hostname" -> List(Constraint("unique"), Constraint("like:slave.*"))
+    assertEquals(None, server.matches(offer(hostname = "slave0")))
+    assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "slave0"), _ => List("slave0")))
+    assertEquals(Some("hostname doesn't match like:slave.*"), server.matches(offer(hostname = "master")))
+    assertEquals(None, server.matches(offer(hostname = "slave0"), _ => List("master")))
   }
 
   @Test
   def matchesAttributes() {
     // like
     server.constraints.clear()
-    server.constraints += "rack" -> Constraint("like:1-.*")
+    server.constraints += "rack" -> List(Constraint("like:1-.*"))
     assertEquals(None, server.matches(offer(attributes = "rack=1-1")))
     assertEquals(None, server.matches(offer(attributes = "rack=1-2")))
     assertEquals(Some("rack doesn't match like:1-.*"), server.matches(offer(attributes = "rack=2-1")))
 
     // unique
     server.constraints.clear()
-    server.constraints += "floor" -> Constraint("unique")
+    server.constraints += "floor" -> List(Constraint("unique"))
     assertEquals(None, server.matches(offer(attributes = "rack=1-1,floor=1")))
     assertEquals(None, server.matches(offer(attributes = "rack=1-1,floor=1"), _ => List("2")))
     assertEquals(Some("floor doesn't match unique"), server.matches(offer(attributes = "rack=1-1,floor=1"), _ => List("1")))
@@ -106,7 +114,7 @@ class ExhibitorServerTest extends MesosTestCase {
   def json() {
     server.state = ExhibitorServer.Staging
     server.constraints.clear()
-    server.constraints += "hostname" -> Constraint("unique")
+    server.constraints += "hostname" -> List(Constraint("unique"))
     server.config.cpus = 1.2
     server.config.mem = 2048
     server.config.hostname = "slave0"
