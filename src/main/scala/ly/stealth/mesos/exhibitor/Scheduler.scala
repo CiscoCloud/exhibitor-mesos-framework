@@ -98,7 +98,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def acceptOffer(offer: Offer): Option[String] = {
+  private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
     cluster.servers.filter(_.state == ExhibitorServer.Stopped).toList match {
       case Nil => Some("all servers are running")
       case servers =>

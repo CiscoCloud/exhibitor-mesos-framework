@@ -22,6 +22,8 @@ import org.junit.Assert._
 import org.junit.{Before, Test}
 import play.api.libs.json.Json
 
+import scala.collection.JavaConversions._
+
 class ExhibitorServerTest extends MesosTestCase {
   var server: ExhibitorServer = null
 
@@ -114,6 +116,69 @@ class ExhibitorServerTest extends MesosTestCase {
 
     val decoded = Json.toJson(server).as[ExhibitorServer]
     ExhibitorServerTest.assertServerEquals(server, decoded)
+  }
+
+  @Test
+  def newExecutor() {
+    val exhibitor = ExhibitorServer("1")
+    exhibitor.config.cpus = 1.5
+
+    val executor = exhibitor.newExecutor("")
+    val command = executor.getCommand
+    assertTrue(command.getUrisCount > 0)
+
+    val cmd = command.getValue
+    assertTrue(cmd, cmd.contains(Executor.getClass.getName.replace("$", "")))
+  }
+
+  @Test
+  def newTask() {
+    val exhibitor = ExhibitorServer("1")
+    exhibitor.config.cpus = 1.5
+    exhibitor.config.mem = 1024
+
+    val offer = this.offer(slaveId = "slave0", hostname = "host", ports = "1000")
+
+    val task = exhibitor.createTask(offer)
+    assertEquals("slave0", task.getSlaveId.getValue)
+    assertNotNull(task.getExecutor)
+
+    val resources = task.getResourcesList.toList.map(res => res.getName -> res).toMap
+
+    val cpuResourceOpt = resources.get("cpus")
+    assertNotEquals(None, cpuResourceOpt)
+    val cpuResource = cpuResourceOpt.get
+    assertEquals(exhibitor.config.cpus, cpuResource.getScalar.getValue, 0.001)
+
+    val memResourceOpt = resources.get("mem")
+    assertNotEquals(None, memResourceOpt)
+    val memResource = memResourceOpt.get
+    assertEquals(exhibitor.config.mem, memResource.getScalar.getValue, 0.001)
+
+    val portsResourceOpt = resources.get("ports")
+    assertNotEquals(None, portsResourceOpt)
+    val portsResource = portsResourceOpt.get
+    assertEquals(1, portsResource.getRanges.getRangeCount)
+
+    val range = portsResource.getRanges.getRangeList.toList.head
+    assertEquals(1000, range.getBegin)
+    assertEquals(1000, range.getEnd)
+  }
+
+  @Test
+  def acceptOffer() {
+    val exhibitor = ExhibitorServer("1")
+    val offer = this.offer(cpus = exhibitor.config.cpus, mem = exhibitor.config.mem.toLong)
+
+    val allServersRunning = Scheduler.acceptOffer(offer)
+    assertEquals(allServersRunning, Some("all servers are running"))
+
+    Scheduler.cluster.servers += exhibitor
+    exhibitor.state = ExhibitorServer.Stopped
+    val accepted = Scheduler.acceptOffer(offer)
+    assertEquals(None, accepted)
+    assertEquals(1, schedulerDriver.launchedTasks.size())
+    assertEquals(0, schedulerDriver.killedTasks.size())
   }
 }
 

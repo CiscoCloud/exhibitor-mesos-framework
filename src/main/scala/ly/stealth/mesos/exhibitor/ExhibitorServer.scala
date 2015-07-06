@@ -109,7 +109,7 @@ case class ExhibitorServer(id: String) {
     None
   }
 
-  private def newExecutor(id: String): ExecutorInfo = {
+  private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
     val cmd = s"java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
 
     val commandBuilder = CommandInfo.newBuilder()
