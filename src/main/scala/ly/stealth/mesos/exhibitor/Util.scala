@@ -30,7 +30,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 object Util {
-  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): Map[String, String] = {
+  def parseList(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): List[(String, String)] = {
     def splitEscaped(s: String, sep: Char, unescape: Boolean = false): Array[String] = {
       val parts = new util.ArrayList[String]()
 
@@ -54,8 +54,8 @@ object Util {
       parts.toArray(Array[String]())
     }
 
-    val result = new mutable.HashMap[String, String]()
-    if (s == null) return result.toMap
+    val result = new mutable.ListBuffer[(String, String)]()
+    if (s == null) return result.toList
 
     for (entry <- splitEscaped(s, entrySep)) {
       if (entry.trim.isEmpty) throw new IllegalArgumentException(s)
@@ -65,13 +65,15 @@ object Util {
       val value: String = if (pair.length > 1) pair(1).trim else null
 
       if (value == null && !nullValues) throw new IllegalArgumentException(s)
-      result.put(key, value)
+      result += key -> value
     }
 
-    result.toMap
+    result.toList
   }
 
-  def formatMap(map: collection.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = {
+  def parseMap(s: String, entrySep: Char = ',', valueSep: Char = '=', nullValues: Boolean = true): Map[String, String] = parseList(s, entrySep, valueSep, nullValues).toMap
+
+  def formatList(list: List[(String, _ <: Any)], entrySep: Char = ',', valueSep: Char = '='): String = {
     def escape(s: String): String = {
       var result = ""
 
@@ -84,14 +86,20 @@ object Util {
     }
 
     var s = ""
-    for ((k, v) <- map) {
+    list.foreach { tuple =>
       if (!s.isEmpty) s += entrySep
-      s += escape(k)
-      if (v != null) s += valueSep + escape("" + v)
+      s += escape(tuple._1)
+      if (tuple._2 != null) s += valueSep + escape("" + tuple._2)
     }
 
     s
   }
+
+  def formatMap(map: collection.Map[String, _ <: Any], entrySep: Char = ',', valueSep: Char = '='): String = formatList(map.toList, entrySep, valueSep)
+
+  def formatConstraints(constraints: scala.collection.Map[String, List[Constraint]]): String = formatList(constraints.toList.flatMap { case (name, values) =>
+    values.map(name -> _)
+  })
 
   case class Range(start: Int, end: Int) {
     def overlap(r: Range): Range = {

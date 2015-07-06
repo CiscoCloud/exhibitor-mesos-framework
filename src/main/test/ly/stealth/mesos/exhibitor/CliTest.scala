@@ -91,7 +91,8 @@ class CliTest extends MesosTestCase {
     assertEquals(1, server.constraints.size)
     val constraint = server.constraints.head
     assertEquals("hostname", constraint._1)
-    assertEquals(Constraint("like:slave.*"), constraint._2)
+    assertEquals(1, constraint._2.size)
+    assertEquals(Constraint("like:slave.*"), constraint._2.head)
     assertEquals(1.5, server.config.cpus, 0.001)
     assertEquals(2048, server.config.mem, 0.001)
     assertEquals(5000, server.config.sharedConfigChangeBackoff)

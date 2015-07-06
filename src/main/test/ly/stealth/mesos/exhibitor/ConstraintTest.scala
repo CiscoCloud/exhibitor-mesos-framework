@@ -41,6 +41,13 @@ class ConstraintTest {
       case Failure(t) if t.isInstanceOf[IllegalArgumentException] => assertTrue("" + t, t.getMessage.contains("Unsupported condition"))
       case other => fail(other.toString)
     }
+
+    val constraints = Constraint.parse("hostname=unique,hostname=like:slave.*")
+    assertEquals(1, constraints.size)
+    val hostnameConstraintsOpt = constraints.get("hostname")
+    assertNotEquals(None, hostnameConstraintsOpt)
+    val hostnameConstraints = hostnameConstraintsOpt.get
+    assertEquals(2, hostnameConstraints.size)
   }
 
   @Test
