@@ -133,10 +133,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
     status.getState match {
       case TaskState.TASK_RUNNING =>
         onServerStarted(server, driver, status)
-      case TaskState.TASK_LOST | TaskState.TASK_FAILED |
-           TaskState.TASK_KILLED | TaskState.TASK_ERROR =>
-        onServerStopped(server, status)
-      case TaskState.TASK_FINISHED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
+      case TaskState.TASK_LOST | TaskState.TASK_FAILED | TaskState.TASK_ERROR =>
+        onServerFailed(server, status)
+      case TaskState.TASK_FINISHED | TaskState.TASK_KILLED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
   }
@@ -157,7 +156,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def onServerStopped(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
+  private def onServerFailed(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
     serverOpt match {
       case Some(server) => server.state = ExhibitorServer.Stopped
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
@@ -166,7 +165,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
-      driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
+      if (server.state == ExhibitorServer.Staging || server.state == ExhibitorServer.Running)
+        driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
+
       server.state = ExhibitorServer.Added
       server
     }
@@ -174,9 +175,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[exhibitor] def removeServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
-      if (server.state == ExhibitorServer.Running) stopServer(id)
+      stopServer(id)
 
-      server.state = ExhibitorServer.Stopped
       cluster.servers -= server
       removeFromEnsemble(server)
       server

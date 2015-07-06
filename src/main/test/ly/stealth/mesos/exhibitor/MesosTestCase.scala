@@ -28,8 +28,10 @@ import org.apache.mesos.Protos.Value.{Scalar, Text}
 import org.apache.mesos.Protos._
 import org.apache.mesos.{ExecutorDriver, SchedulerDriver}
 import org.junit.{After, Before, Ignore}
+import play.api.libs.json.Json
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 @Ignore
 class MesosTestCase {
@@ -167,7 +169,7 @@ class MesosTestCase {
             id: String = "" + UUID.randomUUID(),
             name: String = "Task",
             slaveId: String = "" + UUID.randomUUID(),
-            data: String = null
+            data: String = Json.stringify(Json.toJson(TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), UUID.randomUUID().toString)))
             ): TaskInfo = {
     val builder = TaskInfo.newBuilder()
       .setName(id)
@@ -271,7 +273,7 @@ class MesosTestCase {
 
     private val _statusUpdates: util.List[TaskStatus] = new util.concurrent.CopyOnWriteArrayList[TaskStatus]()
 
-    def statusUpdates: util.List[TaskStatus] = util.Collections.unmodifiableList(_statusUpdates)
+    def statusUpdates: List[TaskStatus] = _statusUpdates.toList
 
     def start(): Status = {
       status = Status.DRIVER_RUNNING

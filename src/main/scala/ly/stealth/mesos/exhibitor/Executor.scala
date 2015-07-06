@@ -114,9 +114,10 @@ object Executor extends org.apache.mesos.Executor {
       .setMessage("" + stackTrace).build)
   }
 
-  private def stopExecutor(async: Boolean = false) {
+  private[exhibitor] def stopExecutor(async: Boolean = false) {
     def triggerStop() {
       if (exhibitor.isStarted) exhibitor.stop()
+      //TODO stop driver here?
     }
 
     if (async) {

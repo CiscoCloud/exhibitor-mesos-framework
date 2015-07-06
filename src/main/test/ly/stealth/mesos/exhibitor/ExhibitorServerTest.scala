@@ -113,14 +113,19 @@ class ExhibitorServerTest extends MesosTestCase {
     server.config.sharedConfigOverride += "zookeeper-install-directory" -> "/tmp/zookeeper"
 
     val decoded = Json.toJson(server).as[ExhibitorServer]
+    ExhibitorServerTest.assertServerEquals(server, decoded)
+  }
+}
 
-    assertEquals(server.state, decoded.state)
-    assertEquals(server.constraints, decoded.constraints)
-    assertEquals(server.config.cpus, decoded.config.cpus, 0.001)
-    assertEquals(server.config.mem, decoded.config.mem, 0.001)
-    assertEquals(server.config.hostname, decoded.config.hostname)
-    assertEquals(server.config.sharedConfigChangeBackoff, decoded.config.sharedConfigChangeBackoff)
-    assertEquals(server.config.exhibitorConfig, decoded.config.exhibitorConfig)
-    assertEquals(server.config.sharedConfigOverride, decoded.config.sharedConfigOverride)
+object ExhibitorServerTest {
+  def assertServerEquals(expected: ExhibitorServer, actual: ExhibitorServer) {
+    assertEquals(expected.state, actual.state)
+    assertEquals(expected.constraints, actual.constraints)
+    assertEquals(expected.config.cpus, actual.config.cpus, 0.001)
+    assertEquals(expected.config.mem, actual.config.mem, 0.001)
+    assertEquals(expected.config.hostname, actual.config.hostname)
+    assertEquals(expected.config.sharedConfigChangeBackoff, actual.config.sharedConfigChangeBackoff)
+    assertEquals(expected.config.exhibitorConfig, actual.config.exhibitorConfig)
+    assertEquals(expected.config.sharedConfigOverride, actual.config.sharedConfigOverride)
   }
 }
