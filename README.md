@@ -279,10 +279,14 @@ Usage: add <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
 
 constraint examples:
-  like:slave0   - value equals 'slave0'
-  unlike:slave0 - value is not equal to 'slave0'
-  like:slave.*  - value starts with 'slave'
-  unique        - all values are unique
+  like:slave0    - value equals 'slave0'
+  unlike:slave0  - value is not equal to 'slave0'
+  like:slave.*   - value starts with 'slave'
+  unique         - all values are unique
+  cluster        - all values are the same
+  cluster:slave0 - value equals 'slave0'
+  groupBy        - all values are the same
+  groupBy:3      - all values are within 3 different groups
 ```
 
 Configuring servers in the cluster
