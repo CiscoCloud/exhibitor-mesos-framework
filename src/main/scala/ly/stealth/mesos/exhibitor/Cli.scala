@@ -103,10 +103,10 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val response = sendRequest("/add", config).as[ExhibitorServerApiResponse]
+        val response = sendRequest("/add", config).as[ApiResponse]
         printLine(response.message)
         printLine()
-        response.value.foreach(printExhibitorServer(_))
+        response.value.foreach(printCluster)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -117,10 +117,10 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val response = sendRequest("/start", config).as[ExhibitorServerApiResponse]
+        val response = sendRequest("/start", config).as[ApiResponse]
         printLine(response.message)
         printLine()
-        response.value.foreach(printExhibitorServer(_))
+        response.value.foreach(printCluster)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -131,7 +131,7 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val response = sendRequest("/stop", config).as[ExhibitorServerApiResponse]
+        val response = sendRequest("/stop", config).as[ApiResponse]
         printLine(response.message)
         printLine()
       case None => throw CliError("Invalid arguments")
@@ -144,7 +144,7 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val response = sendRequest("/remove", config).as[ExhibitorServerApiResponse]
+        val response = sendRequest("/remove", config).as[ApiResponse]
         printLine(response.message)
         printLine()
       case None => throw CliError("Invalid arguments")
@@ -156,7 +156,7 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val cluster = sendRequest("/status", config).as[ClusterApiResponse]
+        val cluster = sendRequest("/status", config).as[ApiResponse]
         printCluster(cluster.value.get)
       case None => throw CliError("Invalid arguments")
     }
@@ -168,17 +168,17 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val response = sendRequest("/config", config).as[ExhibitorServerApiResponse]
+        val response = sendRequest("/config", config).as[ApiResponse]
         printLine(response.message)
         printLine()
-        response.value.foreach(printExhibitorServer(_))
+        response.value.foreach(printCluster(_))
       case None => throw CliError("Invalid arguments")
     }
   }
 
   private def getID(args: Array[String], usage: () => Unit): String = {
     args.headOption match {
-      case Some(ids) => Try(Util.Range.parseRanges(ids)) match {
+      case Some(ids) => Try(ids.split(",").map(Util.Range(_))) match {
         case Success(_) => ids
         case Failure(e) => throw CliError(s"Invalid id range: ${e.getMessage}")
       }

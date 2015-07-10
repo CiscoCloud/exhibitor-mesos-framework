@@ -120,6 +120,8 @@ object Util {
       Range(start, end)
     }
 
+    def values: List[Int] = (start to end).toList
+
     override def toString: String = if (start == end) s"$start" else s"$start..$end"
   }
 

@@ -38,6 +38,16 @@ case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
     }
   }
 
+  def expandIds(expr: String): List[String] = {
+    if (expr == null || expr == "") throw new IllegalArgumentException("ID expression cannot be null or empty")
+    else {
+      expr.split(",").flatMap { part =>
+        if (part == "*") return servers.map(_.id).toList
+        else Util.Range(part).values.map(_.toString)
+      }.distinct.sorted.toList
+    }
+  }
+
   override def toString: String = servers.toString()
 }
 

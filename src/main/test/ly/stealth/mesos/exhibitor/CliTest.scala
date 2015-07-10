@@ -76,7 +76,7 @@ class CliTest extends MesosTestCase {
   @Test
   def add() {
     exec("add 0 --cpu 1.5 --mem 2048 --constraints hostname=like:slave.* --configchangebackoff 5000")
-    assertContains("Servers added")
+    assertContains("Added servers")
     assertContains("id: 0")
     assertContains("constraints: hostname=like:slave.*")
     assertContains("cpu: 1.5")
@@ -119,7 +119,7 @@ class CliTest extends MesosTestCase {
     assertEquals(server0.state, ExhibitorServer.Stopped)
 
     exec("stop 0")
-    assertContains("Stopped server 0")
+    assertContains("Stopped servers 0")
     assertEquals(server0.state, ExhibitorServer.Added)
   }
 
@@ -128,7 +128,7 @@ class CliTest extends MesosTestCase {
     Scheduler.cluster.servers += ExhibitorServer("0")
     exec("remove 0")
 
-    assertContains("Removed server 0")
+    assertContains("Removed servers 0")
     assertEquals(None, Scheduler.cluster.getServer("0"))
   }
 
