@@ -245,10 +245,14 @@ object Cli {
 
   private def printConstraintExamples() {
     printLine("constraint examples:")
-    printLine("like:slave0   - value equals 'slave0'", 1)
-    printLine("unlike:slave0 - value is not equal to 'slave0'", 1)
-    printLine("like:slave.*  - value starts with 'slave'", 1)
-    printLine("unique        - all values are unique", 1)
+    printLine("like:slave0    - value equals 'slave0'", 1)
+    printLine("unlike:slave0  - value is not equal to 'slave0'", 1)
+    printLine("like:slave.*   - value starts with 'slave'", 1)
+    printLine("unique         - all values are unique", 1)
+    printLine("cluster        - all values are the same", 1)
+    printLine("cluster:slave0 - value equals 'slave0'", 1)
+    printLine("groupBy        - all values are the same", 1)
+    printLine("groupBy:3      - all values are within 3 different groups", 1)
   }
 
   private def printCluster(cluster: List[ExhibitorServer]) {

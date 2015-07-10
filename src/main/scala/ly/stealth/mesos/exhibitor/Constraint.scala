@@ -20,6 +20,8 @@ package ly.stealth.mesos.exhibitor
 
 import java.util.regex.{Pattern, PatternSyntaxException}
 
+import scala.util.Try
+
 trait Constraint {
   def matches(value: String, values: List[String] = Nil): Boolean
 }
@@ -29,6 +31,17 @@ object Constraint {
     if (value.startsWith("like:")) Constraint.Like(value.substring("like:".length))
     else if (value.startsWith("unlike:")) Constraint.Like(value.substring("unlike:".length), negated = true)
     else if (value == "unique") Constraint.Unique()
+    else if (value.startsWith("cluster")) {
+      val tail = value.substring("cluster".length)
+      val cluster = if (tail.startsWith(":")) Some(tail.substring(1)) else None
+      Cluster(cluster)
+    } else if (value.startsWith("groupBy")) {
+      val tail = value.substring("groupBy".length)
+      val groups = if (tail.startsWith(":")) Try(tail.substring(1).toInt).toOption.getOrElse(throw new IllegalArgumentException(s"invalid condition $value"))
+      else 1
+
+      GroupBy(groups)
+    }
     else throw new IllegalArgumentException(s"Unsupported condition: $value")
   }
 
@@ -59,6 +72,28 @@ object Constraint {
     def matches(value: String, values: List[String]): Boolean = !values.contains(value)
 
     override def toString: String = "unique"
+  }
+
+  case class Cluster(value: Option[String]) extends Constraint {
+    def matches(value: String, values: List[String]): Boolean = this.value match {
+      case Some(v) => v == value
+      case None => values.isEmpty || values.head == value
+    }
+
+    override def toString: String = "cluster" + value.map(":" + _).getOrElse("")
+  }
+
+  case class GroupBy(groups: Int = 1) extends Constraint {
+    def matches(value: String, values: List[String]): Boolean = {
+      val counts = values.groupBy(identity).mapValues(_.size)
+      if (counts.size < groups) !counts.contains(value)
+      else {
+        val minCount = counts.values.reduceOption(_ min _).getOrElse(0)
+        counts.getOrElse(value, 0) == minCount
+      }
+    }
+
+    override def toString: String = "groupBy" + (if (groups > 1) s":$groups" else "")
   }
 
 }

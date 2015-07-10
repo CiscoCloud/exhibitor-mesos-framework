@@ -37,6 +37,18 @@ class ConstraintTest {
     val unique = Constraint("unique")
     assertTrue(unique.isInstanceOf[Constraint.Unique])
 
+    val cluster = Constraint("cluster").asInstanceOf[Constraint.Cluster]
+    assertEquals(None, cluster.value)
+
+    val cluster123 = Constraint("cluster:123").asInstanceOf[Constraint.Cluster]
+    assertEquals(Some("123"), cluster123.value)
+
+    val groupBy = Constraint("groupBy").asInstanceOf[Constraint.GroupBy]
+    assertEquals(1, groupBy.groups)
+
+    val groupBy3 = Constraint("groupBy:3").asInstanceOf[Constraint.GroupBy]
+    assertEquals(3, groupBy3.groups)
+
     Try(Constraint("unsupported")) match {
       case Failure(t) if t.isInstanceOf[IllegalArgumentException] => assertTrue("" + t, t.getMessage.contains("Unsupported condition"))
       case other => fail(other.toString)
@@ -60,6 +72,12 @@ class ConstraintTest {
 
     assertTrue(Constraint("unique").matches("a"))
     assertFalse(Constraint("unique").matches("a", List("a")))
+
+    assertTrue(Constraint("cluster").matches("a"))
+    assertFalse(Constraint("cluster").matches("b", List("a")))
+
+    assertTrue(Constraint("groupBy").matches("a", List("a")))
+    assertFalse(Constraint("groupBy").matches("a", List("b")))
   }
 
   @Test
@@ -67,6 +85,10 @@ class ConstraintTest {
     assertEquals("like:abc", "" + Constraint("like:abc"))
     assertEquals("unlike:abc", "" + Constraint("unlike:abc"))
     assertEquals("unique", "" + Constraint("unique"))
+    assertEquals("cluster", "" + Constraint("cluster"))
+    assertEquals("cluster:123", "" + Constraint("cluster:123"))
+    assertEquals("groupBy", "" + Constraint("groupBy"))
+    assertEquals("groupBy:3", "" + Constraint("groupBy:3"))
   }
 
   @Test
@@ -93,5 +115,45 @@ class ConstraintTest {
 
     assertFalse(unique.matches("1", List("1", "2")))
     assertFalse(unique.matches("2", List("1", "2")))
+  }
+
+  @Test
+  def matchesCluster() {
+    val cluster = Constraint("cluster")
+    assertTrue(cluster.matches("1"))
+    assertTrue(cluster.matches("2"))
+
+    assertTrue(cluster.matches("1", List("1")))
+    assertTrue(cluster.matches("1", List("1", "1")))
+    assertFalse(cluster.matches("2", List("1")))
+
+    val cluster3 = Constraint("cluster:3")
+    assertTrue(cluster3.matches("3"))
+    assertFalse(cluster3.matches("2"))
+
+    assertTrue(cluster3.matches("3", List("3")))
+    assertTrue(cluster3.matches("3", List("3", "3")))
+    assertFalse(cluster3.matches("2", List("3")))
+  }
+
+  @Test
+  def matchesGroupBy() {
+    val groupBy = Constraint("groupBy")
+    assertTrue(groupBy.matches("1"))
+    assertTrue(groupBy.matches("1", List("1")))
+    assertTrue(groupBy.matches("1", List("1", "1")))
+    assertFalse(groupBy.matches("1", List("2")))
+
+    val groupBy2 = Constraint("groupBy:2")
+    assertTrue(groupBy2.matches("1"))
+    assertFalse(groupBy2.matches("1", List("1")))
+    assertFalse(groupBy2.matches("1", List("1", "1")))
+    assertTrue(groupBy2.matches("2", List("1")))
+
+    assertTrue(groupBy2.matches("1", List("1", "2")))
+    assertTrue(groupBy2.matches("2", List("1", "2")))
+
+    assertFalse(groupBy2.matches("1", List("1", "1", "2")))
+    assertTrue(groupBy2.matches("2", List("1", "1", "2")))
   }
 }
