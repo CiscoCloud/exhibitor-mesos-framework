@@ -76,7 +76,7 @@ class CliTest extends MesosTestCase {
   @Test
   def add() {
     exec("add 0 --cpu 1.5 --mem 2048 --constraints hostname=like:slave.* --configchangebackoff 5000")
-    assertContains("Server added")
+    assertContains("Servers added")
     assertContains("id: 0")
     assertContains("constraints: hostname=like:slave.*")
     assertContains("cpu: 1.5")

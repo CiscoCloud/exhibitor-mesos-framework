@@ -141,6 +141,8 @@ object Util {
         Range(start, end)
       }
     }
+
+    def parseRanges(ranges: String): Array[Range] = ranges.split(",").map(parse)
   }
 
   object Str {

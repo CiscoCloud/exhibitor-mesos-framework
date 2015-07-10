@@ -25,10 +25,23 @@ import org.apache.log4j.Logger
 import org.eclipse.jetty.server.{Server, ServerConnector}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import play.api.libs.json.Json
+import play.api.libs.json._
 
 import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
+
+// To avoid play-json reads/writes with generics hell it's better just to keep separate case classes
+case class ClusterApiResponse(success: Boolean, message: String, value: Option[Cluster])
+
+object ClusterApiResponse {
+  implicit val format = Json.format[ClusterApiResponse]
+}
+
+case class ExhibitorServerApiResponse(success: Boolean, message: String, value: Option[ExhibitorServer])
+
+object ExhibitorServerApiResponse {
+  implicit val format = Json.format[ExhibitorServerApiResponse]
+}
 
 object HttpServer {
   private val logger = Logger.getLogger(HttpServer.getClass)
@@ -141,10 +154,13 @@ object HttpServer {
       server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
       backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
 
-      Scheduler.cluster.servers += server
-      logger.info(s"Added server to cluster: $server")
-
-      response.getWriter.println(Json.toJson(server))
+      Scheduler.cluster.addServer(server) match {
+        case true =>
+          logger.info(s"Added server to cluster: $server")
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = true, "Servers added", Some(server))))
+        case false =>
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = false, s"Server $id already exists", None)))
+      }
     }
 
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
@@ -157,10 +173,10 @@ object HttpServer {
             logger.info(s"Starting server $id")
           } else logger.warn(s"Server $id already started")
 
-          response.getWriter.println(Json.toJson(s))
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = true, s"Started server $id", Some(s))))
         case None =>
           logger.warn(s"Received start server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = false, s"Server $id does not exist", None)))
       }
     }
 
@@ -168,10 +184,10 @@ object HttpServer {
       val id = request.getParameter("id")
       Scheduler.stopServer(id) match {
         case Some(s) =>
-          response.getWriter.println(Json.toJson(s))
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = true, s"Stopped server $id", Some(s))))
         case None =>
           logger.warn(s"Received stop server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = false, s"Server $id does not exist", None)))
       }
     }
 
@@ -180,15 +196,15 @@ object HttpServer {
       Scheduler.removeServer(id) match {
         case Some(s) =>
           logger.info("Cluster after removal: " + Scheduler.cluster.servers)
-          response.getWriter.println(Json.toJson(s))
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = true, s"Removed server $id", Some(s))))
         case None =>
           logger.warn(s"Received remove server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = false, s"Server $id does not exist", None)))
       }
     }
 
     private def handleClusterStatus(request: HttpServletRequest, response: HttpServletResponse) {
-      response.getWriter.println(Json.toJson(Scheduler.cluster.servers.toList))
+      response.getWriter.println(Json.toJson(ClusterApiResponse(success = true, "", Some(Scheduler.cluster))))
     }
 
     private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath", "s3credentials",
@@ -208,18 +224,12 @@ object HttpServer {
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
 
-          response.getWriter.println(Json.toJson(s))
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = true, s"Updated configuration for server $id", Some(s))))
         case None =>
           logger.warn(s"Received configure server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          response.getWriter.println(Json.toJson(ExhibitorServerApiResponse(success = false, s"Server $id does not exist", None)))
       }
     }
-  }
-
-  private def handleUnknownServer(id: String, response: HttpServletResponse) {
-    val unknownServer = ExhibitorServer(id)
-    unknownServer.state = ExhibitorServer.Unknown
-    response.getWriter.println(Json.toJson(unknownServer))
   }
 
 }
