@@ -25,6 +25,7 @@ import play.api.libs.json.{JsValue, Json}
 import scopt.OptionParser
 
 import scala.io.Source
+import scala.util.{Failure, Success, Try}
 
 object Cli {
   private[exhibitor] var out: PrintStream = System.out
@@ -102,10 +103,10 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val server = sendRequest("/add", config).as[ExhibitorServer]
-        printLine("Server added")
+        val response = sendRequest("/add", config).as[ApiResponse]
+        printLine(response.message)
         printLine()
-        printExhibitorServer(server)
+        response.value.foreach(printCluster)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -116,10 +117,10 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val server = sendRequest("/start", config).as[ExhibitorServer]
-        printLine("Started server")
+        val response = sendRequest("/start", config).as[ApiResponse]
+        printLine(response.message)
         printLine()
-        printExhibitorServer(server)
+        response.value.foreach(printCluster)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -130,8 +131,9 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val server = sendRequest("/stop", config).as[ExhibitorServer]
-        printLine(s"Stopped server ${server.id}")
+        val response = sendRequest("/stop", config).as[ApiResponse]
+        printLine(response.message)
+        printLine()
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -142,8 +144,9 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val server = sendRequest("/remove", config).as[ExhibitorServer]
-        printLine(s"Removed server ${server.id}")
+        val response = sendRequest("/remove", config).as[ApiResponse]
+        printLine(response.message)
+        printLine()
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -153,8 +156,8 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val cluster = sendRequest("/status", config).as[List[ExhibitorServer]]
-        printCluster(cluster)
+        val cluster = sendRequest("/status", config).as[ApiResponse]
+        printCluster(cluster.value.get)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -165,15 +168,20 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val server = sendRequest("/config", config).as[ExhibitorServer]
-        printExhibitorServer(server)
+        val response = sendRequest("/config", config).as[ApiResponse]
+        printLine(response.message)
+        printLine()
+        response.value.foreach(printCluster(_))
       case None => throw CliError("Invalid arguments")
     }
   }
 
   private def getID(args: Array[String], usage: () => Unit): String = {
     args.headOption match {
-      case Some(id) => id
+      case Some(ids) => Try(ids.split(",").map(Util.Range(_))) match {
+        case Success(_) => ids
+        case Failure(e) => throw CliError(s"Invalid id range: ${e.getMessage}")
+      }
       case None =>
         usage()
         throw CliError("Argument required")
@@ -255,9 +263,9 @@ object Cli {
     printLine("groupBy:3      - all values are within 3 different groups", 1)
   }
 
-  private def printCluster(cluster: List[ExhibitorServer]) {
+  private def printCluster(cluster: Cluster) {
     printLine("cluster:")
-    cluster.foreach(printExhibitorServer(_, 1))
+    cluster.servers.foreach(printExhibitorServer(_, 1))
   }
 
   private def printExhibitorServer(server: ExhibitorServer, indent: Int = 0) {

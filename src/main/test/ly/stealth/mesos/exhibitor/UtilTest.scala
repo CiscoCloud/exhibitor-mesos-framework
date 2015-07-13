@@ -183,6 +183,13 @@ class UtilTest {
   }
 
   @Test
+  def rangeValues() {
+    assertEquals(List(3), Range(3).values)
+    assertEquals(List(0, 1), Range(0, 1).values)
+    assertEquals(List(0, 1, 2, 3, 4), Range(0, 4).values)
+  }
+
+  @Test
   def toStringRange() {
     assertEquals("0", "" + Range("0"))
     assertEquals("0..10", "" + Range("0..10"))

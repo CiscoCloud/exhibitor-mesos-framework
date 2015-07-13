@@ -25,10 +25,16 @@ import org.apache.log4j.Logger
 import org.eclipse.jetty.server.{Server, ServerConnector}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import play.api.libs.json.Json
+import play.api.libs.json._
 
 import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
+
+case class ApiResponse(success: Boolean, message: String, value: Option[Cluster])
+
+object ApiResponse {
+  implicit val format = Json.format[ApiResponse]
+}
 
 object HttpServer {
   private val logger = Logger.getLogger(HttpServer.getClass)
@@ -129,66 +135,74 @@ object HttpServer {
     }
 
     private def handleAddServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val id = request.getParameter("id")
+      val idExpr = request.getParameter("id")
+      val ids = Scheduler.cluster.expandIds(idExpr)
       val cpus = Option(request.getParameter("cpu"))
       val mem = Option(request.getParameter("mem"))
       val constraints = Option(request.getParameter("constraints"))
       val backoff = Option(request.getParameter("configchangebackoff"))
 
-      val server = ExhibitorServer(id)
-      cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
-      mem.foreach(mem => server.config.mem = mem.toDouble)
-      server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
-      backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
-
-      Scheduler.cluster.servers += server
-      logger.info(s"Added server to cluster: $server")
-
-      response.getWriter.println(Json.toJson(server))
+      val existing = ids.filter(Scheduler.cluster.getServer(_).isDefined)
+      if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
+      else {
+        val servers = ids.map { id =>
+          val server = ExhibitorServer(id)
+          cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
+          mem.foreach(mem => server.config.mem = mem.toDouble)
+          server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
+          backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
+          Scheduler.cluster.addServer(server)
+          server
+        }
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Added servers $idExpr", Some(Cluster(servers)))))
+      }
     }
 
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val id = request.getParameter("id")
+      val idExpr = request.getParameter("id")
+      val ids = Scheduler.cluster.expandIds(idExpr)
 
-      Scheduler.cluster.getServer(id) match {
-        case Some(s) =>
-          if (s.state == ExhibitorServer.Added) {
-            s.state = ExhibitorServer.Stopped
+      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
+      else {
+        val servers = ids.map { id =>
+          val server = Scheduler.cluster.getServer(id).get
+          if (server.state == ExhibitorServer.Added) {
+            server.state = ExhibitorServer.Stopped
             logger.info(s"Starting server $id")
           } else logger.warn(s"Server $id already started")
-
-          response.getWriter.println(Json.toJson(s))
-        case None =>
-          logger.warn(s"Received start server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          server
+        }
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(servers)))))
       }
     }
 
     private def handleStopServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val id = request.getParameter("id")
-      Scheduler.stopServer(id) match {
-        case Some(s) =>
-          response.getWriter.println(Json.toJson(s))
-        case None =>
-          logger.warn(s"Received stop server for unknown server id: $id")
-          handleUnknownServer(id, response)
+      val idExpr = request.getParameter("id")
+      val ids = Scheduler.cluster.expandIds(idExpr)
+
+      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
+      else {
+        val servers = ids.flatMap(Scheduler.stopServer)
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Stopped servers $idExpr", Some(Cluster(servers)))))
       }
     }
 
     private def handleRemoveServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val id = request.getParameter("id")
-      Scheduler.removeServer(id) match {
-        case Some(s) =>
-          logger.info("Cluster after removal: " + Scheduler.cluster.servers)
-          response.getWriter.println(Json.toJson(s))
-        case None =>
-          logger.warn(s"Received remove server for unknown server id: $id")
-          handleUnknownServer(id, response)
+      val idExpr = request.getParameter("id")
+      val ids = Scheduler.cluster.expandIds(idExpr)
+
+      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
+      else {
+        val servers = ids.flatMap(Scheduler.removeServer)
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Removed servers $idExpr", Some(Cluster(servers)))))
       }
     }
 
     private def handleClusterStatus(request: HttpServletRequest, response: HttpServletResponse) {
-      response.getWriter.println(Json.toJson(Scheduler.cluster.servers.toList))
+      response.getWriter.println(Json.toJson(ApiResponse(success = true, "", Some(Scheduler.cluster))))
     }
 
     private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath", "s3credentials",
@@ -196,30 +210,26 @@ object HttpServer {
     private val sharedConfigs = Set("zookeeper-install-directory", "zookeeper-data-directory")
 
     private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val id = request.getParameter("id")
+      val idExpr = request.getParameter("id")
+      val ids = Scheduler.cluster.expandIds(idExpr)
 
-      Scheduler.cluster.getServer(id) match {
-        case Some(s) =>
-          logger.info(s"Received configurations for server $id: ${request.getParameterMap.toMap.map(entry => entry._1 -> entry._2.head)}")
+      logger.info(s"Received configurations for servers $idExpr: ${request.getParameterMap.toMap.map(entry => entry._1 -> entry._2.head)}")
 
+      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
+      else {
+        val servers = ids.map { id =>
+          val server = Scheduler.cluster.getServer(id).get
           request.getParameterMap.toMap.foreach {
-            case (key, Array(value)) if exhibitorConfigs.contains(key) => s.config.exhibitorConfig += key -> value
-            case (key, Array(value)) if sharedConfigs.contains(key) => s.config.sharedConfigOverride += key -> value
+            case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
+            case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
-
-          response.getWriter.println(Json.toJson(s))
-        case None =>
-          logger.warn(s"Received configure server for unknown server id: $id")
-          handleUnknownServer(id, response)
+          server
+        }
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Updated configuration for servers $idExpr", Some(Cluster(servers)))))
       }
     }
-  }
-
-  private def handleUnknownServer(id: String, response: HttpServletResponse) {
-    val unknownServer = ExhibitorServer(id)
-    unknownServer.state = ExhibitorServer.Unknown
-    response.getWriter.println(Json.toJson(unknownServer))
   }
 
 }

@@ -18,12 +18,43 @@
 
 package ly.stealth.mesos.exhibitor
 
+import play.api.libs.json._
+
 import scala.collection.mutable.ListBuffer
 
-case class Cluster() {
+case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
   private[exhibitor] val servers = new ListBuffer[ExhibitorServer]
+  //add anything that was passed to constructor
+  exhibitorServers.foreach(servers += _)
 
   def getServer(id: String): Option[ExhibitorServer] = servers.find(_.id == id)
 
+  def addServer(server: ExhibitorServer): Boolean = {
+    servers.find(_.id == server.id) match {
+      case Some(_) => false
+      case None =>
+        servers += server
+        true
+    }
+  }
+
+  def expandIds(expr: String): List[String] = {
+    if (expr == null || expr == "") throw new IllegalArgumentException("ID expression cannot be null or empty")
+    else {
+      expr.split(",").flatMap { part =>
+        if (part == "*") return servers.map(_.id).toList
+        else Util.Range(part).values.map(_.toString)
+      }.distinct.sorted.toList
+    }
+  }
+
   override def toString: String = servers.toString()
+}
+
+object Cluster {
+  implicit val writer = new Writes[Cluster] {
+    override def writes(o: Cluster): JsValue = Json.obj("cluster" -> o.servers.toList)
+  }
+
+  implicit val reader = Reads.at[List[ExhibitorServer]](__ \ 'cluster).map(Cluster(_))
 }

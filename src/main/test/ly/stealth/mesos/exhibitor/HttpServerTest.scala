@@ -41,21 +41,24 @@ class HttpServerTest extends MesosTestCase {
 
   @Test
   def addServer() {
-    val responseServer = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128")).as[ExhibitorServer]
+    val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128")).as[ApiResponse]
     assertEquals(1, Scheduler.cluster.servers.size)
     val server = Scheduler.cluster.servers.head
 
     assertEquals("0", server.id)
     assertEquals(0.6, server.config.cpus, 0.001)
     assertEquals(128, server.config.mem, 0.001)
+    assertTrue(response.message.contains("Added servers"))
+    assert(response.success)
+    assertNotEquals(None, response.value)
 
-    ExhibitorServerTest.assertServerEquals(server, responseServer)
+    ExhibitorServerTest.assertServerEquals(server, response.value.get.servers.head)
   }
 
   @Test
   def configServer() {
     sendRequest("/add", parseMap("id=0"))
-    val responseServer = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper")).as[ExhibitorServer]
+    val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper")).as[ApiResponse]
 
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
@@ -65,7 +68,10 @@ class HttpServerTest extends MesosTestCase {
     assertEquals(mutable.Map("zkconfigconnect" -> "192.168.3.1:2181"), server.config.exhibitorConfig)
     assertEquals(mutable.Map("zookeeper-install-directory" -> "/tmp/zookeeper"), server.config.sharedConfigOverride)
 
-    ExhibitorServerTest.assertServerEquals(server, responseServer)
+    assertTrue(response.success)
+    assertTrue(response.message.contains("Updated configuration"))
+    assertNotEquals(None, response.value)
+    ExhibitorServerTest.assertServerEquals(server, response.value.get.servers.head)
   }
 
   @Test
@@ -74,9 +80,11 @@ class HttpServerTest extends MesosTestCase {
     sendRequest("/add", parseMap("id=1"))
     sendRequest("/add", parseMap("id=2"))
 
-    val cluster = sendRequest("/status", Map()).as[List[ExhibitorServer]]
-    assertEquals(3, cluster.size)
-    assertEquals(3, cluster.map(_.id).distinct.size)
+    val response = sendRequest("/status", Map()).as[ApiResponse]
+    assertTrue(response.success)
+    assertNotEquals(None, response.value)
+    assertEquals(3, response.value.get.servers.size)
+    assertEquals(3, response.value.get.servers.map(_.id).distinct.size)
   }
 
   @Test
@@ -93,10 +101,16 @@ class HttpServerTest extends MesosTestCase {
   def startStopServer() {
     sendRequest("/add", parseMap("id=0"))
 
-    val responseServer = sendRequest("/start", parseMap("id=0")).as[ExhibitorServer]
-    assertEquals(ExhibitorServer.Stopped, responseServer.state)
+    val startResponse = sendRequest("/start", parseMap("id=0")).as[ApiResponse]
+    assertTrue(startResponse.success)
+    assertTrue(startResponse.message.contains("Started servers"))
+    assertNotEquals(None, startResponse.value)
+    assertEquals(ExhibitorServer.Stopped, startResponse.value.get.servers.head.state)
 
-    val stoppedServer = sendRequest("/stop", parseMap("id=0")).as[ExhibitorServer]
-    assertEquals(ExhibitorServer.Added, stoppedServer.state)
+    val stopResponse = sendRequest("/stop", parseMap("id=0")).as[ApiResponse]
+    assertTrue(stopResponse.success)
+    assertTrue(stopResponse.message.contains("Stopped servers"))
+    assertNotEquals(None, stopResponse.value)
+    assertEquals(ExhibitorServer.Added, stopResponse.value.get.servers.head.state)
   }
 }

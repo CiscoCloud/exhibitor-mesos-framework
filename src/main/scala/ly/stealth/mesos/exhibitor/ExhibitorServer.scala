@@ -151,8 +151,6 @@ object ExhibitorServer {
 
   sealed trait State
 
-  case object Unknown extends State
-
   case object Added extends State
 
   case object Stopped extends State
@@ -179,7 +177,6 @@ object ExhibitorServer {
       (__ \ 'config).read[TaskConfig])((id, state, constraints, config) => {
     val server = ExhibitorServer(id)
     state match {
-      case "Unknown" => server.state = Unknown
       case "Added" => server.state = Added
       case "Stopped" => server.state = Stopped
       case "Staging" => server.state = Staging
