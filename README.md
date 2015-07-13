@@ -102,17 +102,18 @@ First lets start 1 Exhibitor with the default settings. Further in the readme yo
 
 ```
 # ./exhibitor-mesos.sh add 0
-Server added
+Added servers 0
 
-server:
-  id: 0
-  state: Added
-  constraints: hostname=unique
-  exhibitor config:
-  shared config overrides:
-  cpu: 0.2
-  mem: 256.0
-  sharedConfigChangeBackoff: 10000
+cluster:
+  server:
+    id: 0
+    state: Added
+    constraints: hostname=unique
+    exhibitor config:
+    shared config overrides:
+    cpu: 0.2
+    mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 You now have a cluster with 1 server that is not started.
@@ -135,42 +136,46 @@ Each server requires some basic configuration.
 
 ```
 # ./exhibitor-mesos.sh config 0 --configtype zookeeper --zkconfigconnect 192.168.3.1:2181 --zkconfigzpath /exhibitor/config --zookeeper-install-directory /tmp/zookeeper --zookeeper-data-directory /tmp/zkdata
-server:
-  id: 0
-  state: Added
-  constraints: hostname=unique
-  exhibitor config:
-    zkconfigzpath: /exhibitor/config
-    zkconfigconnect: 192.168.3.1:2181
-    configtype: zookeeper
-  shared config overrides:
-    zookeeper-install-directory: /tmp/zookeeper
-    zookeeper-data-directory: /tmp/zkdata
-  cpu: 0.2
-  mem: 256.0
-  sharedConfigChangeBackoff: 10000
+Updated configuration for servers 0
+
+cluster:
+  server:
+    id: 0
+    state: Added
+    constraints: hostname=unique
+    exhibitor config:
+      zkconfigzpath: /exhibitor/config
+      zkconfigconnect: 192.168.3.1:2181
+      configtype: zookeeper
+    shared config overrides:
+      zookeeper-install-directory: /tmp/zookeeper
+      zookeeper-data-directory: /tmp/zkdata
+    cpu: 0.2
+    mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 Now lets start the server. The state should change from `Added` to `Stopped` meaning the task is waiting for resources to be offered.
 
 ```
 # ./exhibitor-mesos.sh start 0
-Started server
+Started servers 0
 
-server:
-  id: 0
-  state: Stopped
-  constraints: hostname=unique
-  exhibitor config:
-    zkconfigzpath: /exhibitor/config
-    zkconfigconnect: 192.168.3.1:2181
-    configtype: zookeeper
-  shared config overrides:
-    zookeeper-install-directory: /tmp/zookeeper
-    zookeeper-data-directory: /tmp/zkdata
-  cpu: 0.2
-  mem: 256.0
-  sharedConfigChangeBackoff: 10000
+cluster:
+  server:
+    id: 0
+    state: Stopped
+    constraints: hostname=unique
+    exhibitor config:
+      zkconfigzpath: /exhibitor/config
+      zkconfigconnect: 192.168.3.1:2181
+      configtype: zookeeper
+    shared config overrides:
+      zookeeper-install-directory: /tmp/zookeeper
+      zookeeper-data-directory: /tmp/zkdata
+    cpu: 0.2
+    mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 Now as we don't know where the server we may ask for the cluster status to see where the endpoint is.
@@ -181,7 +186,7 @@ cluster:
   server:
     id: 0
     state: Running
-    endpoint: http://slave1:31000/exhibitor/v1/ui/index.html
+    endpoint: http://slave0:31000/exhibitor/v1/ui/index.html
     constraints: hostname=unique
     exhibitor config:
       zkconfigzpath: /exhibitor/config
@@ -200,14 +205,14 @@ By now you should have a single Exhibitor instance running. Here's how you stop 
 
 ```
 # ./exhibitor-mesos.sh stop 0
-Stopped server 0
+Stopped servers 0
 ```
 
 If you want to remove the server from the cluster completely you may skip `stop` step and call `remove` directly (this will call `stop` under the hood anyway):
 
 ```
-# ./exhibitor-mesos.sh remove 0
-Removed server 0
+./exhibitor-mesos.sh remove 0
+Removed servers 0
 ```
 
 Typical Operations
@@ -218,24 +223,26 @@ Changing the location of Zookeeper data
 
 ```
 # ./exhibitor-mesos.sh stop 0
-Stopped server 0
+Stopped servers 0
 
 # ./exhibitor-mesos.sh config 0 --zookeeper-data-directory /tmp/exhibitor_zkdata
-server:
-  id: 0
-  state: Added
-  constraints: hostname=unique
-  exhibitor config:
-    zkconfigzpath: /exhibitor/config
-    zkconfigconnect: 192.168.3.1:2181
-    port: 31000
-    configtype: zookeeper
-  shared config overrides:
-    zookeeper-install-directory: /tmp/zookeeper
-    zookeeper-data-directory: /tmp/exhibitor_zkdata
-  cpu: 0.2
-  mem: 256.0
-  sharedConfigChangeBackoff: 10000
+Updated configuration for servers 0
+
+cluster:
+  server:
+    id: 0
+    state: Added
+    constraints: hostname=unique
+    exhibitor config:
+      zkconfigzpath: /exhibitor/config
+      zkconfigconnect: 192.168.3.1:2181
+      configtype: zookeeper
+    shared config overrides:
+      zookeeper-install-directory: /tmp/zookeeper
+      zookeeper-data-directory: /tmp/exhibitor_zkdata
+    cpu: 0.2
+    mem: 256.0
+    sharedConfigChangeBackoff: 10000
 ```
 
 Navigating the CLI
