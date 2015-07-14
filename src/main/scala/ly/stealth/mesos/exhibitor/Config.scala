@@ -20,6 +20,9 @@ package ly.stealth.mesos.exhibitor
 
 import java.net.URI
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 object Config {
   var debug: Boolean = false
 
@@ -27,6 +30,9 @@ object Config {
   var user: String = null
 
   var api: String = null
+
+  var frameworkName: String = "Exhibitor"
+  var frameworkTimeout: Duration = 30 days
 
   var ensembleModifyRetries: Int = 60
   var ensembleModifyBackoff: Long = 1000
