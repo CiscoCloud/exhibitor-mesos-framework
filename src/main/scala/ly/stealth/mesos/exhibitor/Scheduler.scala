@@ -25,6 +25,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(Config.user)
     frameworkBuilder.setName("Exhibitor")
+    frameworkBuilder.setCheckpoint(true)
 
     val driver = new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master)
 
