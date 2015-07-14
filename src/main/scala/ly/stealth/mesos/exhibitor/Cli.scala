@@ -24,6 +24,7 @@ import java.net.{HttpURLConnection, URL, URLEncoder}
 import play.api.libs.json.{JsValue, Json}
 import scopt.OptionParser
 
+import scala.concurrent.duration.Duration
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
@@ -88,6 +89,8 @@ object Cli {
 
         Config.master = config("master")
         Config.user = config("user")
+        config.get("frameworkname").foreach(name => Config.frameworkName = name)
+        config.get("frameworktimeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
         config.get("ensemblemodifyretries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
         config.get("ensemblemodifybackoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
@@ -171,7 +174,7 @@ object Cli {
         val response = sendRequest("/config", config).as[ApiResponse]
         printLine(response.message)
         printLine()
-        response.value.foreach(printCluster(_))
+        response.value.foreach(printCluster)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -307,6 +310,15 @@ object Cli {
 
       opt[String]('u', "user").required().text("Mesos user. Required.").action { (value, config) =>
         config.updated("user", value)
+      }
+
+      opt[String]("frameworkname").optional().text("Mesos framework name. Defaults to Exhibitor. Optional").action { (value, config) =>
+        config.updated("frameworkname", value)
+      }
+
+      opt[String]("frameworktimeout").optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
+        Duration(value)
+        config.updated("frameworktimeout", value)
       }
 
       opt[Int]("ensemblemodifyretries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>

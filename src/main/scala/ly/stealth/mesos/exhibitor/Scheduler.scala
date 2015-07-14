@@ -1,6 +1,7 @@
 package ly.stealth.mesos.exhibitor
 
 import java.util
+import java.util.concurrent.TimeUnit
 
 import ly.stealth.mesos.exhibitor.Util.Str
 import org.apache.log4j._
@@ -24,7 +25,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(Config.user)
-    frameworkBuilder.setName("Exhibitor")
+    frameworkBuilder.setName(Config.frameworkName)
+    frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.toUnit(TimeUnit.SECONDS))
     frameworkBuilder.setCheckpoint(true)
 
     val driver = new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master)
