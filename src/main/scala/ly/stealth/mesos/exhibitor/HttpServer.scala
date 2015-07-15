@@ -109,6 +109,7 @@ object HttpServer {
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
       else if (uri.startsWith("/zookeeper/")) downloadFile(HttpServer.zookeeperDist, response)
       else if (uri.startsWith("/s3credentials/")) downloadFile(new File(uri.split("/").last), response)
+      else if (uri.startsWith("/defaultconfig/")) downloadFile(new File(uri.split("/").last), response)
       else if (uri.startsWith("/api")) handleApi(request, response)
       else response.sendError(404)
     }
@@ -205,9 +206,12 @@ object HttpServer {
       response.getWriter.println(Json.toJson(ApiResponse(success = true, "", Some(Scheduler.cluster))))
     }
 
-    private val exhibitorConfigs = Set("configtype", "zkconfigconnect", "zkconfigzpath", "s3credentials",
-      "s3region", "s3config", "s3configprefix")
-    private val sharedConfigs = Set("zookeeper-install-directory", "zookeeper-data-directory")
+    private val exhibitorConfigs = Set("configtype", "configcheckms", "defaultconfig", "headingtext", "hostname", "jquerystyle", "loglines", "nodemodification",
+      "prefspath", "servo", "timeout", "s3credentials", "s3region", "s3config", "s3configprefix", "zkconfigconnect", "zkconfigexhibitorpath", "zkconfigexhibitorport",
+      "zkconfigpollms", "zkconfigretry", "zkconfigzpath", "filesystembackup", "s3backup", "aclid", "aclperms", "aclscheme")
+    private val sharedConfigs = Set("log-index-directory", "zookeeper-install-directory", "zookeeper-data-directory", "zookeeper-log-directory",
+      "backup-extra", "zoo-cfg-extra", "java-environment", "log4j-properties", "client-port", "connect-port", "election-port",
+      "check-ms", "cleanup-period-ms", "cleanup-max-files", "backup-max-store-ms", "backup-period-ms")
 
     private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {
       val idExpr = request.getParameter("id")
