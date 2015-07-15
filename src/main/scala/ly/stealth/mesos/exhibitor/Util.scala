@@ -102,7 +102,7 @@ object Util {
   })
 
   case class Range(start: Int, end: Int) {
-    def overlap(r: Range): Range = {
+    def overlap(r: Range): Option[Range] = {
       var x: Range = this
       var y: Range = r
       if (x.start > y.start) {
@@ -112,12 +112,12 @@ object Util {
       }
       assert(x.start <= y.start)
 
-      if (y.start > x.end) return null
+      if (y.start > x.end) return None
       assert(y.start <= x.end)
 
       val start = y.start
       val end = Math.min(x.end, y.end)
-      Range(start, end)
+      Some(Range(start, end))
     }
 
     def values: List[Int] = (start to end).toList
@@ -144,7 +144,10 @@ object Util {
       }
     }
 
-    def parseRanges(ranges: String): Array[Range] = ranges.split(",").map(parse)
+    def parseRanges(ranges: String): List[Range] = {
+      if (ranges.isEmpty) Nil
+      else ranges.split(",").map(parse).toList
+    }
   }
 
   object Str {

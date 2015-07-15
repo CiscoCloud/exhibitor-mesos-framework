@@ -142,6 +142,7 @@ object HttpServer {
       val mem = Option(request.getParameter("mem"))
       val constraints = Option(request.getParameter("constraints"))
       val backoff = Option(request.getParameter("configchangebackoff"))
+      val ports = Option(request.getParameter("port"))
 
       val existing = ids.filter(Scheduler.cluster.getServer(_).isDefined)
       if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
@@ -150,6 +151,7 @@ object HttpServer {
           val server = ExhibitorServer(id)
           cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
           mem.foreach(mem => server.config.mem = mem.toDouble)
+          ports.foreach(ports => server.config.ports = Util.Range.parseRanges(ports))
           server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
           backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
           Scheduler.cluster.addServer(server)
@@ -227,6 +229,7 @@ object HttpServer {
           request.getParameterMap.toMap.foreach {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
+            case ("port", Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
           server

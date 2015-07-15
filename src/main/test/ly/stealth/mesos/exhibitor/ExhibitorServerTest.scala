@@ -188,6 +188,31 @@ class ExhibitorServerTest extends MesosTestCase {
     assertEquals(1, schedulerDriver.launchedTasks.size())
     assertEquals(0, schedulerDriver.killedTasks.size())
   }
+
+  @Test
+  def ports() {
+    def port(taskPorts: String, offerPorts: String): Option[Long] = {
+      val exhibitor = ExhibitorServer("0")
+      exhibitor.config.ports = Util.Range.parseRanges(taskPorts)
+      val offer = this.offer(ports = offerPorts)
+      exhibitor.getPort(offer)
+    }
+
+    // any port
+    assertEquals(Some(31000), port("", "31000..32000"))
+
+    // overlapping single port
+    assertEquals(Some(31010), port("31010", "31000..32000"))
+
+    // overlapping port range
+    assertEquals(Some(31010), port("31010..31100", "31000..32000"))
+
+    // overlapping second port range
+    assertEquals(Some(31020), port("4000..4100,31020..31100", "31000..32000"))
+
+    // no match
+    assertEquals(None, port("4000..4100", "31000..32000"))
+  }
 }
 
 object ExhibitorServerTest {
