@@ -27,7 +27,7 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, minPort: Int = 31050, maxPort: Int = 32613)
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var minPort: Int = 31050, var maxPort: Int = 32613)
 
 object TaskConfig {
   implicit val reader = (

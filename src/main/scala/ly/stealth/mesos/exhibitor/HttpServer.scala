@@ -223,6 +223,13 @@ object HttpServer {
           request.getParameterMap.toMap.foreach {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
+            case ("ports", Array(value)) => {
+                val portRange = value.split("\\.\\.", 2)
+                if (portRange.size == 2) {
+                  server.config.minPort = portRange(0).toInt
+                  server.config.maxPort = portRange(1).toInt
+                }
+            }
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
           server
