@@ -50,7 +50,9 @@ object TaskConfig {
         "hostname" -> tc.hostname,
         "cpu" -> tc.cpus,
         "mem" -> tc.mem,
-        "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff
+        "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff,
+        "minPort" -> tc.minPort,
+        "maxPort" -> tc.maxPort
       )
     }
   }

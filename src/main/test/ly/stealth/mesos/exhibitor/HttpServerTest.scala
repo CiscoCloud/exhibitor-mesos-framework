@@ -41,13 +41,15 @@ class HttpServerTest extends MesosTestCase {
 
   @Test
   def addServer() {
-    val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128")).as[ApiResponse]
+    val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128,ports=3000..8000")).as[ApiResponse]
     assertEquals(1, Scheduler.cluster.servers.size)
     val server = Scheduler.cluster.servers.head
 
     assertEquals("0", server.id)
     assertEquals(0.6, server.config.cpus, 0.001)
     assertEquals(128, server.config.mem, 0.001)
+    assertEquals(3000, server.config.minPort)
+    assertEquals(8000, server.config.maxPort)
     assertTrue(response.message.contains("Added servers"))
     assert(response.success)
     assertNotEquals(None, response.value)

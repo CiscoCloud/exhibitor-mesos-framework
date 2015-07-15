@@ -141,6 +141,7 @@ object HttpServer {
       val mem = Option(request.getParameter("mem"))
       val constraints = Option(request.getParameter("constraints"))
       val backoff = Option(request.getParameter("configchangebackoff"))
+      val ports = Option(request.getParameter("ports"))
 
       val existing = ids.filter(Scheduler.cluster.getServer(_).isDefined)
       if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
@@ -149,6 +150,12 @@ object HttpServer {
           val server = ExhibitorServer(id)
           cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
           mem.foreach(mem => server.config.mem = mem.toDouble)
+          if (!ports.isEmpty) {
+            val portRange = ports.get.split("\\.\\.")
+            val (minPort, maxPort) = (portRange(0), portRange(1))
+            server.config.minPort = minPort.toInt
+            server.config.maxPort = maxPort.toInt
+          }
           server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
           backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
           Scheduler.cluster.addServer(server)

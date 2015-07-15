@@ -360,6 +360,10 @@ object Cli {
       opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
         config.updated("api", value)
       }
+
+      opt[String]("ports").optional().text("Port range to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated("ports", value)
+      }
     }
 
     val start = defaultParser("start <id>")
@@ -548,6 +552,10 @@ object Cli {
 
       opt[String]("backup-period-ms").optional().text("Backup period ms shared config. Optional.").action { (value, config) =>
         config.updated("backup-period-ms", value)
+      }
+
+      opt[String]("ports").optional().text("Port range to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated("ports", value)
       }
     }
 
