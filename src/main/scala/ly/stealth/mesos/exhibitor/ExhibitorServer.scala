@@ -27,7 +27,7 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var minPort: Int = 31050, var maxPort: Int = 32613)
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var minPort: Int = 0, var maxPort: Int = 65535)
 
 object TaskConfig {
   implicit val reader = (
@@ -37,7 +37,9 @@ object TaskConfig {
       (__ \ 'hostname).read[String] and
       (__ \ 'sharedConfigChangeBackoff).read[Long] and
       (__ \ 'cpu).read[Double] and
-      (__ \ 'mem).read[Double])(TaskConfig.apply _)
+      (__ \ 'mem).read[Double] and
+      (__ \ 'minPort).read[Int] and
+      (__ \ 'maxPort).read[Int])(TaskConfig.apply _)
 
   implicit val writer = new Writes[TaskConfig] {
     def writes(tc: TaskConfig): JsValue = {
@@ -198,6 +200,8 @@ object ExhibitorServer {
     server.config.mem = config.mem
     server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
     server.config.hostname = config.hostname
+    server.config.minPort = config.minPort
+    server.config.maxPort = config.maxPort
     server
   })
 
