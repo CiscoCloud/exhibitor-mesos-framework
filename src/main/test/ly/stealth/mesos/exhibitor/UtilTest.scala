@@ -163,23 +163,23 @@ class UtilTest {
   @Test
   def overlap() {
     // no overlap
-    assertNull(Range(0, 10).overlap(Range(20, 30)))
-    assertNull(Range(20, 30).overlap(Range(0, 10)))
-    assertNull(Range(0).overlap(Range(1)))
+    assertEquals(None, Range(0, 10).overlap(Range(20, 30)))
+    assertEquals(None, Range(20, 30).overlap(Range(0, 10)))
+    assertEquals(None, Range(0).overlap(Range(1)))
 
     // partial
-    assertEquals(Range(5, 10), Range(0, 10).overlap(Range(5, 15)))
-    assertEquals(Range(5, 10), Range(5, 15).overlap(Range(0, 10)))
+    assertEquals(Some(Range(5, 10)), Range(0, 10).overlap(Range(5, 15)))
+    assertEquals(Some(Range(5, 10)), Range(5, 15).overlap(Range(0, 10)))
 
     // includes
-    assertEquals(Range(2, 3), Range(0, 10).overlap(Range(2, 3)))
-    assertEquals(Range(2, 3), Range(2, 3).overlap(Range(0, 10)))
-    assertEquals(Range(5), Range(0, 10).overlap(Range(5)))
+    assertEquals(Some(Range(2, 3)), Range(0, 10).overlap(Range(2, 3)))
+    assertEquals(Some(Range(2, 3)), Range(2, 3).overlap(Range(0, 10)))
+    assertEquals(Some(Range(5)), Range(0, 10).overlap(Range(5)))
 
     // last point
-    assertEquals(Range(0), Range(0, 10).overlap(Range(0)))
-    assertEquals(Range(10), Range(0, 10).overlap(Range(10)))
-    assertEquals(Range(0), Range(0).overlap(Range(0)))
+    assertEquals(Some(Range(0)), Range(0, 10).overlap(Range(0)))
+    assertEquals(Some(Range(10)), Range(0, 10).overlap(Range(10)))
+    assertEquals(Some(Range(0)), Range(0).overlap(Range(0)))
   }
 
   @Test

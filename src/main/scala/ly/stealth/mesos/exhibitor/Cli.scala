@@ -296,6 +296,11 @@ object Cli {
     printLine(s"cpu: ${config.cpus}", indent)
     printLine(s"mem: ${config.mem}", indent)
     printLine(s"sharedConfigChangeBackoff: ${config.sharedConfigChangeBackoff}", indent)
+    val ports = config.ports match {
+      case Nil => "auto"
+      case _ => config.ports.mkString(",")
+    }
+    printLine(s"port: $ports", indent)
   }
 
   private object Parsers {
@@ -361,8 +366,8 @@ object Cli {
         config.updated("api", value)
       }
 
-      opt[String]("ports").optional().text("Port range to accept, when offer is issued. Optional").action { (value, config) =>
-        config.updated("ports", value)
+      opt[String]("port").optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated("port", value)
       }
     }
 
@@ -554,8 +559,8 @@ object Cli {
         config.updated("backup-period-ms", value)
       }
 
-      opt[String]("ports").optional().text("Port range to accept, when offer is issued. Optional").action { (value, config) =>
-        config.updated("ports", value)
+      opt[String]("port").optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated("port", value)
       }
     }
 

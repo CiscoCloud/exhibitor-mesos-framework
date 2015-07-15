@@ -75,7 +75,7 @@ class CliTest extends MesosTestCase {
 
   @Test
   def add() {
-    exec("add 0 --cpu 1.5 --mem 2048 --constraints hostname=like:slave.* --configchangebackoff 5000 --ports 3000..8000")
+    exec("add 0 --cpu 1.5 --mem 2048 --constraints hostname=like:slave.* --configchangebackoff 5000 --port 3000..8000")
     assertContains("Added servers")
     assertContains("id: 0")
     assertContains("constraints: hostname=like:slave.*")
@@ -96,19 +96,21 @@ class CliTest extends MesosTestCase {
     assertEquals(1.5, server.config.cpus, 0.001)
     assertEquals(2048, server.config.mem, 0.001)
     assertEquals(5000, server.config.sharedConfigChangeBackoff)
-    assertEquals(3000, server.config.minPort)
-    assertEquals(8000, server.config.maxPort)
+    assertEquals(1, server.config.ports.size)
+    assertEquals(3000, server.config.ports.head.start)
+    assertEquals(8000, server.config.ports.head.end)
   }
 
   @Test
   def config() {
     Scheduler.cluster.servers += ExhibitorServer("0")
 
-    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --ports 33..55")
+    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55")
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
-    assertEquals(serverOpt.get.config.minPort, 33)
-    assertEquals(serverOpt.get.config.maxPort, 55)
+    assertEquals(1, serverOpt.get.config.ports.size)
+    assertEquals(serverOpt.get.config.ports.head.start, 33)
+    assertEquals(serverOpt.get.config.ports.head.end, 55)
     assertContains("zkconfigconnect: 192.168.3.1:2181")
     assertContains("zookeeper-install-directory: /tmp/zookeeper")
   }

@@ -114,6 +114,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 You now have a cluster with 1 server that is not started.
@@ -130,6 +131,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 Each server requires some basic configuration.
@@ -153,6 +155,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 Now lets start the server. The state should change from `Added` to `Stopped` meaning the task is waiting for resources to be offered.
@@ -176,6 +179,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 Now as we don't know where the server we may ask for the cluster status to see where the endpoint is.
@@ -199,6 +203,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 By now you should have a single Exhibitor instance running. Here's how you stop it:
@@ -243,6 +248,7 @@ cluster:
     cpu: 0.2
     mem: 256.0
     sharedConfigChangeBackoff: 10000
+    port: auto
 ```
 
 Navigating the CLI
@@ -284,6 +290,8 @@ Usage: add <id> [options]
         Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
+  --port <value>
+        Port ranges to accept, when offer is issued. Optional
 
 constraint examples:
   like:slave0    - value equals 'slave0'
@@ -299,10 +307,10 @@ constraint examples:
 Configuring servers in the cluster
 ----------------------
 
-**NOTE**: this section is not final some configurations will change.
+**NOTE**: this section is not final and some configurations may change.
 
 ```
-# ./exhibitor-mesos.sh help config
+# ../exhibitor-mesos.sh help config
 Usage: config <id> [options]
 
   -a <value> | --api <value>
@@ -391,6 +399,8 @@ Usage: config <id> [options]
         Backup max store ms shared config. Optional.
   --backup-period-ms <value>
         Backup period ms shared config. Optional.
+  --port <value>
+        Port ranges to accept, when offer is issued. Optional
 ```
 
 Starting servers in the cluster

@@ -19,6 +19,7 @@
 package ly.stealth.mesos.exhibitor
 
 import com.google.protobuf.ByteString
+import ly.stealth.mesos.exhibitor.Util.Range
 import org.apache.mesos.Protos
 import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
@@ -27,7 +28,7 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var minPort: Int = 0, var maxPort: Int = 65535)
+case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var ports: List[Range] = Nil)
 
 object TaskConfig {
   implicit val reader = (
@@ -38,8 +39,7 @@ object TaskConfig {
       (__ \ 'sharedConfigChangeBackoff).read[Long] and
       (__ \ 'cpu).read[Double] and
       (__ \ 'mem).read[Double] and
-      (__ \ 'minPort).read[Int] and
-      (__ \ 'maxPort).read[Int])(TaskConfig.apply _)
+      (__ \ 'ports).read[String].map(Range.parseRanges))(TaskConfig.apply _)
 
   implicit val writer = new Writes[TaskConfig] {
     def writes(tc: TaskConfig): JsValue = {
@@ -51,8 +51,7 @@ object TaskConfig {
         "cpu" -> tc.cpus,
         "mem" -> tc.mem,
         "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff,
-        "minPort" -> tc.minPort,
-        "maxPort" -> tc.maxPort
+        "ports" -> tc.ports.mkString(",")
       )
     }
   }
@@ -137,18 +136,11 @@ case class ExhibitorServer(id: String) {
       .build
   }
 
-  private def getPort(offer: Offer): Option[Long] = {
-    val ports = Util.getRangeResources(offer, "ports")
-    val minPortOffered = ports.headOption.map(_.getBegin)
-    val maxPortOffered = ports.lastOption.map(_.getBegin)
-    if (minPortOffered.isEmpty || maxPortOffered.isEmpty ||
-      !(minPortOffered.get >= config.minPort &&
-        maxPortOffered.get <= config.maxPort &&
-        maxPortOffered.get >= minPortOffered.get)) {
-      return None
-    }
+  private[exhibitor] def getPort(offer: Offer): Option[Long] = {
+    val ports = Util.getRangeResources(offer, "ports").map(r => Range(r.getBegin.toInt, r.getEnd.toInt))
 
-    ports.headOption.map(_.getBegin)
+    if (config.ports == Nil) ports.headOption.map(_.start)
+    else ports.flatMap(range => config.ports.flatMap(range.overlap)).headOption.map(_.start)
   }
 
   def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
@@ -202,8 +194,7 @@ object ExhibitorServer {
     server.config.mem = config.mem
     server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
     server.config.hostname = config.hostname
-    server.config.minPort = config.minPort
-    server.config.maxPort = config.maxPort
+    server.config.ports = config.ports
     server
   })
 
