@@ -126,6 +126,11 @@ case class ExhibitorServer(id: String) {
         .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/s3credentials/" + creds))
     }
 
+    this.config.exhibitorConfig.get("defaultconfig").foreach { config =>
+      commandBuilder
+        .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/defaultconfig/" + config))
+    }
+
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder().setValue(id))
       .setCommand(commandBuilder)

@@ -119,6 +119,7 @@ class Exhibitor extends IExhibitor {
 }
 
 object Exhibitor {
+  private val logger = Logger.getLogger(classOf[Exhibitor])
   private lazy val loader = initLoader
 
   private def initLoader: ClassLoader = {
@@ -132,6 +133,7 @@ object Exhibitor {
     val params = props.flatMap { case (key, value) =>
       Array(s"--$key", value)
     }.toArray
+    logger.info(s"Exhibitor params: ${params.mkString(" ")}")
 
     val exhibitorCreatorClass = loader.loadClass("com.netflix.exhibitor.standalone.ExhibitorCreator")
     val securityArgumentsClass = loader.loadClass("com.netflix.exhibitor.standalone.SecurityArguments")
