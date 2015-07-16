@@ -45,6 +45,10 @@ Build Exhibitor Standalone if necessary (**NOTE**: version built with Gradle may
 Download Apache Zookeeper distribution if you don't have one (or place the archive to the working folder):
 
     # wget http://apache.cp.if.ua/zookeeper/zookeeper-3.4.6/zookeeper-3.4.6.tar.gz
+    
+Download Oracle JDK distribution (or place the archive to the working folder). **NOTE**: please pay attention it MUST be Oracle JDK (not OpenJDK and not JRE) as Exhibitor relies on `jps` calls:
+
+    # wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u45-b14/jdk-8u45-linux-x64.tar.gz
 
 Environment Configuration
 --------------------------
