@@ -72,6 +72,7 @@ class MesosTestCase {
     HttpServer.jar = createTempFile("executor.jar", "executor")
     HttpServer.exhibitorDist = createTempFile("exhibitor-1.5.5.jar", "exhibitor")
     HttpServer.zookeeperDist = createTempFile("zookeeper-3.4.6.tar.gz", "zookeeper")
+    HttpServer.jdkDist = createTempFile("jdk-8u45-linux-x64.tar.gz", "java")
   }
 
   @After

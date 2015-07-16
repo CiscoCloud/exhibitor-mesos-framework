@@ -115,12 +115,14 @@ case class ExhibitorServer(id: String) {
   }
 
   private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
-    val cmd = s"java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
+    val java = "$(find jdk* -maxdepth 0 -type d)" // find non-recursively a directory starting with "jdk"
+    val cmd = s"export PATH=$$MESOS_DIRECTORY/$java/bin:$$PATH && java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
 
     val commandBuilder = CommandInfo.newBuilder()
     commandBuilder
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/exhibitor/" + HttpServer.exhibitorDist.getName))
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/zookeeper/" + HttpServer.zookeeperDist.getName).setExtract(true))
+      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jdk/" + HttpServer.jdkDist.getName).setExtract(true))
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
       .setValue(cmd)
 

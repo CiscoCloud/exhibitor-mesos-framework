@@ -43,10 +43,12 @@ object HttpServer {
   val jarMask = "mesos-exhibitor.*\\.jar"
   val exhibitorMask = "exhibitor.*\\.jar"
   val zookeeperMask = "zookeeper.*"
+  val jdkMask = "jdk.*"
 
   private[exhibitor] var jar: File = null
   private[exhibitor] var exhibitorDist: File = null
   private[exhibitor] var zookeeperDist: File = null
+  private[exhibitor] var jdkDist: File = null
 
   def start(resolveDeps: Boolean = true) {
     if (server != null) throw new IllegalStateException("HttpServer already started")
@@ -85,11 +87,13 @@ object HttpServer {
       if (file.getName.matches(jarMask)) jar = file
       if (file.getName.matches(exhibitorMask)) exhibitorDist = file
       if (file.getName.matches(zookeeperMask) && !file.isDirectory) zookeeperDist = file
+      if (file.getName.matches(jdkMask)) jdkDist = file
     }
 
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
     if (exhibitorDist == null) throw new IllegalStateException(exhibitorMask + " not found in in current dir")
     if (zookeeperDist == null) throw new IllegalStateException(zookeeperMask + " not found in in current dir")
+    if (jdkDist == null) throw new IllegalStateException(jdkMask + " not found in in current dir")
   }
 
   class Servlet extends HttpServlet {
@@ -108,6 +112,7 @@ object HttpServer {
       if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
       else if (uri.startsWith("/zookeeper/")) downloadFile(HttpServer.zookeeperDist, response)
+      else if (uri.startsWith("/jdk/")) downloadFile(HttpServer.jdkDist, response)
       else if (uri.startsWith("/s3credentials/")) downloadFile(new File(uri.split("/").last), response)
       else if (uri.startsWith("/defaultconfig/")) downloadFile(new File(uri.split("/").last), response)
       else if (uri.startsWith("/api")) handleApi(request, response)
