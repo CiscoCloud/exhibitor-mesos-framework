@@ -18,11 +18,15 @@
 
 package ly.stealth.mesos.exhibitor
 
+import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.collection.mutable.ListBuffer
 
 case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
+  private val storage = Cluster.newStorage(Config.storage)
+  private[exhibitor] var frameworkId: Option[String] = None
+
   private[exhibitor] val servers = new ListBuffer[ExhibitorServer]
   //add anything that was passed to constructor
   exhibitorServers.foreach(servers += _)
@@ -48,13 +52,34 @@ case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
     }
   }
 
+  def save() = storage.save(this)(Cluster.writer)
+
+  def load() {
+    storage.load(Cluster.reader).foreach { cluster =>
+      this.frameworkId = cluster.frameworkId
+      //TODO load servers too
+    }
+  }
+
   override def toString: String = servers.toString()
 }
 
 object Cluster {
-  implicit val writer = new Writes[Cluster] {
-    override def writes(o: Cluster): JsValue = Json.obj("cluster" -> o.servers.toList)
+  private def newStorage(storage: String): Storage[Cluster] = {
+    storage.split(":", 2) match {
+      case Array("file", fileName) => FileStorage(fileName)
+      case _ => throw new IllegalArgumentException(s"Unsupported storage: $storage")
+    }
   }
 
-  implicit val reader = Reads.at[List[ExhibitorServer]](__ \ 'cluster).map(Cluster(_))
+  implicit val writer = new Writes[Cluster] {
+    override def writes(o: Cluster): JsValue = Json.obj("frameworkid" -> o.frameworkId, "cluster" -> o.servers.toList)
+  }
+
+  implicit val reader = ((__ \ 'frameworkid).readNullable[String] and
+    (__ \ 'cluster).read[List[ExhibitorServer]])((frameworkId, servers) => {
+    val cluster = Cluster(servers)
+    cluster.frameworkId = frameworkId
+    cluster
+  })
 }

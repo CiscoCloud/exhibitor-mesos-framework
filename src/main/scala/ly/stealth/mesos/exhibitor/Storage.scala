@@ -18,29 +18,30 @@
 
 package ly.stealth.mesos.exhibitor
 
-import java.net.URI
+import java.io.{File, FileWriter}
 
-import scala.concurrent.duration._
-import scala.language.postfixOps
+import play.api.libs.json.{Json, Reads, Writes}
 
-object Config {
-  var debug: Boolean = false
+import scala.io.Source
 
-  var master: String = null
-  var user: String = null
+trait Storage[T] {
+  def save(value: T)(implicit writes: Writes[T])
 
-  var api: String = null
+  def load(implicit reads: Reads[T]): Option[T]
+}
 
-  var storage: String = "file:exhibitor-mesos.json"
+case class FileStorage[T](file: String) extends Storage[T] {
+  override def save(value: T)(implicit writes: Writes[T]) {
+    val writer = new FileWriter(file)
+    try {
+      writer.write(Json.stringify(Json.toJson(value)))
+    } finally {
+      writer.close()
+    }
+  }
 
-  var frameworkName: String = "Exhibitor"
-  var frameworkTimeout: Duration = 30 days
-
-  var ensembleModifyRetries: Int = 60
-  var ensembleModifyBackoff: Long = 1000
-
-  def httpServerPort: Int = {
-    val port = new URI(api).getPort
-    if (port == -1) 80 else port
+  override def load(implicit reads: Reads[T]): Option[T] = {
+    if (!new File(file).exists()) None
+    else Json.parse(Source.fromFile(file).mkString).asOpt[T]
   }
 }
