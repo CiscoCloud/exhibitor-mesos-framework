@@ -20,10 +20,11 @@ package ly.stealth.mesos.exhibitor
 
 import org.junit.Assert._
 import org.junit.Test
+import play.api.libs.json.{Writes, Reads}
 
 import scala.util.{Failure, Try}
 
-class ClusterTest {
+class ClusterTest extends MesosTestCase {
   @Test
   def expandIds() {
     val cluster = Cluster()
@@ -48,5 +49,17 @@ class ClusterTest {
 
     // sorting
     assertEquals(List("2", "3", "4"), cluster.expandIds("4,3,2"))
+  }
+
+  @Test
+  def loadSave() {
+    val cluster = Cluster()
+    cluster.frameworkId = Some("some id")
+    cluster.save()
+
+    val loaded = Cluster()
+    loaded.load()
+
+    assertEquals(cluster.frameworkId, loaded.frameworkId)
   }
 }

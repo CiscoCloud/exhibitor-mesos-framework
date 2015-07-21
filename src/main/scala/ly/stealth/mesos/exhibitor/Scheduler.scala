@@ -21,10 +21,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     initLogging()
     logger.info(s"Starting ${getClass.getSimpleName}:\n$Config")
 
+    cluster.load()
     HttpServer.start()
 
     val frameworkBuilder = FrameworkInfo.newBuilder()
     frameworkBuilder.setUser(Config.user)
+    cluster.frameworkId.foreach(id => frameworkBuilder.setId(FrameworkID.newBuilder().setValue(id)))
     frameworkBuilder.setName(Config.frameworkName)
     frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.toUnit(TimeUnit.SECONDS))
     frameworkBuilder.setCheckpoint(true)
@@ -44,6 +46,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   override def registered(driver: SchedulerDriver, id: FrameworkID, master: MasterInfo) {
     logger.info("[registered] framework:" + Str.id(id.getValue) + " master:" + Str.master(master))
+
+    cluster.frameworkId = Some(id.getValue)
+    cluster.save()
 
     this.driver = driver
   }

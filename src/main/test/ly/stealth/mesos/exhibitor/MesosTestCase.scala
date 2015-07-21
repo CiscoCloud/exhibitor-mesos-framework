@@ -44,6 +44,7 @@ class MesosTestCase {
 
     val storageFile = File.createTempFile(getClass.getSimpleName, null)
     storageFile.delete()
+    Config.storage = s"file:${storageFile.getAbsolutePath}"
 
     Config.api = "http://localhost:7000"
     Scheduler.cluster.servers.clear()
