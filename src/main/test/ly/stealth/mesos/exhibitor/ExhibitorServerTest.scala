@@ -106,8 +106,8 @@ class ExhibitorServerTest extends MesosTestCase {
 
   @Test
   def idFromTaskId() {
-    assertEquals("0", ExhibitorServer.idFromTaskId("exhibitor-0-slave0-31000"))
-    assertEquals("100", ExhibitorServer.idFromTaskId("exhibitor-100-slave1-32571"))
+    assertEquals("0", ExhibitorServer.idFromTaskId(ExhibitorServer.nextTaskId("0")))
+    assertEquals("100", ExhibitorServer.idFromTaskId(ExhibitorServer.nextTaskId("100")))
   }
 
   @Test
