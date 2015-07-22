@@ -18,6 +18,8 @@
 
 package ly.stealth.mesos.exhibitor
 
+import java.util.UUID
+
 import com.google.protobuf.ByteString
 import ly.stealth.mesos.exhibitor.Util.Range
 import org.apache.mesos.Protos
@@ -68,12 +70,13 @@ case class ExhibitorServer(id: String) {
   def createTask(offer: Offer): TaskInfo = {
     val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
 
-    val id = s"exhibitor-${this.id}-${offer.getHostname}-$port"
+    val name = s"exhibitor-${this.id}"
+    val id = ExhibitorServer.nextTaskId(this.id)
     this.config.exhibitorConfig.put("port", port.toString)
     this.config.hostname = offer.getHostname
     val taskId = TaskID.newBuilder().setValue(id).build
-    TaskInfo.newBuilder().setName(taskId.getValue).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-      .setExecutor(newExecutor(id))
+    TaskInfo.newBuilder().setName(name).setTaskId(taskId).setSlaveId(offer.getSlaveId)
+      .setExecutor(newExecutor(this.id))
       .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
       .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
       .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
@@ -154,9 +157,11 @@ case class ExhibitorServer(id: String) {
 }
 
 object ExhibitorServer {
+  def nextTaskId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
+
   def idFromTaskId(taskId: String): String = {
-    taskId.split("-") match {
-      case Array(_, id, _, _) => id
+    taskId.split("-", 3) match {
+      case Array(_, id, _) => id
       case _ => throw new IllegalArgumentException(taskId)
     }
   }

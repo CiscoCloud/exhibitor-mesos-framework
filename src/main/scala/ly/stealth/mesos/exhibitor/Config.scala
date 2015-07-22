@@ -33,7 +33,7 @@ object Config {
 
   var storage: String = "file:exhibitor-mesos.json"
 
-  var frameworkName: String = "Exhibitor"
+  var frameworkName: String = "exhibitor"
   var frameworkTimeout: Duration = 30 days
 
   var ensembleModifyRetries: Int = 60
