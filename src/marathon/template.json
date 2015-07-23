@@ -1,0 +1,26 @@
+{
+  "id": "exhibitor-mesos-scheduler",
+  "cpus": 1,
+  "mem": 512,
+  "instances": 1,
+  "cmd": "$(find jdk* -maxdepth 0 -type d)/bin/java -jar mesos-exhibitor-0.1.jar scheduler --debug true --master master:5050 --user vagrant --api http://$HOST:$PORT0",
+  "uris": [
+    "http://192.168.3.1:7777/mesos-exhibitor-0.1.jar",
+    "http://192.168.3.1:7777/exhibitor-1.5.5-all.jar",
+    "http://192.168.3.1:7777/jdk-8u45-linux-x64.tar.gz",
+    "http://192.168.3.1:7777/zookeeper.zip"
+  ],
+  "constraints": [["hostname", "LIKE", "master"]],
+  "ports": [31000],
+  "healthChecks": [
+    {
+      "protocol": "HTTP",
+      "path": "/health",
+      "gracePeriodSeconds": 120,
+      "intervalSeconds": 60,
+      "portIndex": 0,
+      "timeoutSeconds": 30,
+      "maxConsecutiveFailures": 3
+    }
+  ]
+}

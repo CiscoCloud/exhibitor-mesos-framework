@@ -109,7 +109,8 @@ object HttpServer {
 
     def handle(request: HttpServletRequest, response: HttpServletResponse) {
       val uri = request.getRequestURI
-      if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
+      if (uri.startsWith("/health")) handleHealth(response)
+      else if (uri.startsWith("/jar/")) downloadFile(HttpServer.jar, response)
       else if (uri.startsWith("/exhibitor/")) downloadFile(HttpServer.exhibitorDist, response)
       else if (uri.startsWith("/zookeeper/")) downloadFile(HttpServer.zookeeperDist, response)
       else if (uri.startsWith("/jdk/")) downloadFile(HttpServer.jdkDist, response)
@@ -138,6 +139,11 @@ object HttpServer {
       else if (uri == "status") handleClusterStatus(request, response)
       else if (uri == "config") handleConfigureServer(request, response)
       else response.sendError(404)
+    }
+
+    private def handleHealth(response: HttpServletResponse) {
+      response.setContentType("text/plain; charset=utf-8")
+      response.getWriter.println("ok")
     }
 
     private def handleAddServer(request: HttpServletRequest, response: HttpServletResponse) {

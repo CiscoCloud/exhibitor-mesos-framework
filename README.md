@@ -10,6 +10,7 @@ This is still being developed actively and is not yet alpha. [Open issues here](
 * [Quick start](#quick-start)  
 
 [Typical Operations](#typical-operations)  
+* [Running scheduler in Marathon](https://github.com/CiscoCloud/exhibitor-mesos-framework/tree/master/src/marathon)   
 * [Changing the location of Zookeeper data](#changing-the-location-of-zookeeper-data)
 
 [Navigating the CLI](#navigating-the-cli)  
