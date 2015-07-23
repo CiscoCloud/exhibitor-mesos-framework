@@ -11,5 +11,16 @@
     "http://192.168.3.1:7777/zookeeper.zip"
   ],
   "constraints": [["hostname", "LIKE", "master"]],
-  "ports": [31000]
+  "ports": [31000],
+  "healthChecks": [
+    {
+      "protocol": "HTTP",
+      "path": "/health",
+      "gracePeriodSeconds": 120,
+      "intervalSeconds": 60,
+      "portIndex": 0,
+      "timeoutSeconds": 30,
+      "maxConsecutiveFailures": 3
+    }
+  ]
 }
