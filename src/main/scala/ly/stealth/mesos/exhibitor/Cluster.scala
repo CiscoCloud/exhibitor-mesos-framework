@@ -68,6 +68,7 @@ object Cluster {
   private def newStorage(storage: String): Storage[Cluster] = {
     storage.split(":", 2) match {
       case Array("file", fileName) => FileStorage(fileName)
+      case Array("zk", zk) => ZkStorage(zk)
       case _ => throw new IllegalArgumentException(s"Unsupported storage: $storage")
     }
   }

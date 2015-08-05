@@ -91,6 +91,7 @@ object Cli {
         Config.user = config("user")
         config.get("frameworkname").foreach(name => Config.frameworkName = name)
         config.get("frameworktimeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
+        config.get("storage").foreach(storage => Config.storage = storage)
         config.get("ensemblemodifyretries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
         config.get("ensemblemodifybackoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
@@ -324,6 +325,10 @@ object Cli {
       opt[String]("frameworktimeout").optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
         Duration(value)
         config.updated("frameworktimeout", value)
+      }
+
+      opt[String]("storage").optional().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Defaults to file:exhibitor-mesos.json. Optional.").action { (value, config) =>
+        config.updated("storage", value)
       }
 
       opt[Int]("ensemblemodifyretries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
