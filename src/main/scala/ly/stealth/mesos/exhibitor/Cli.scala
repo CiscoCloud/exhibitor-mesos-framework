@@ -89,11 +89,11 @@ object Cli {
 
         Config.master = config("master")
         Config.user = config("user")
-        config.get("frameworkname").foreach(name => Config.frameworkName = name)
-        config.get("frameworktimeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
+        config.get("framework-name").foreach(name => Config.frameworkName = name)
+        config.get("framework-timeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
         config.get("storage").foreach(storage => Config.storage = storage)
-        config.get("ensemblemodifyretries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
-        config.get("ensemblemodifybackoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
+        config.get("ensemble-modify-retries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
+        config.get("ensemble-modify-backoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
         config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
@@ -318,25 +318,25 @@ object Cli {
         config.updated("user", value)
       }
 
-      opt[String]("frameworkname").optional().text("Mesos framework name. Defaults to Exhibitor. Optional").action { (value, config) =>
-        config.updated("frameworkname", value)
+      opt[String]("framework-name").optional().text("Mesos framework name. Defaults to exhibitor. Optional").action { (value, config) =>
+        config.updated("framework-name", value)
       }
 
-      opt[String]("frameworktimeout").optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
+      opt[String]("framework-timeout").optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
         Duration(value)
-        config.updated("frameworktimeout", value)
+        config.updated("framework-timeout", value)
       }
 
       opt[String]("storage").optional().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Defaults to file:exhibitor-mesos.json. Optional.").action { (value, config) =>
         config.updated("storage", value)
       }
 
-      opt[Int]("ensemblemodifyretries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
-        config.updated("ensemblemodifyretries", value.toString)
+      opt[Int]("ensemble-modify-retries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
+        config.updated("ensemble-modify-retries", value.toString)
       }
 
-      opt[Long]("ensemblemodifybackoff").optional().text("Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.").action { (value, config) =>
-        config.updated("ensemblemodifybackoff", value.toString)
+      opt[Long]("ensemble-modify-backoff").optional().text("Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.").action { (value, config) =>
+        config.updated("ensemble-modify-backoff", value.toString)
       }
 
       opt[Boolean]('d', "debug").optional().text("Debug mode. Optional. Defaults to false.").action { (value, config) =>
