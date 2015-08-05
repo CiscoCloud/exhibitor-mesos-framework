@@ -104,6 +104,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         logger.info(s"Declined offer:\n  $declineReason")
       }
     }
+
+    Scheduler.cluster.save()
   }
 
   private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
@@ -150,6 +152,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       case TaskState.TASK_FINISHED | TaskState.TASK_KILLED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
+
+    Scheduler.cluster.save()
   }
 
   private def onServerStarted(serverOpt: Option[ExhibitorServer], driver: SchedulerDriver, status: TaskStatus) {
