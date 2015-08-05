@@ -77,13 +77,18 @@ Usage: scheduler [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   -u <value> | --user <value>
         Mesos user. Required.
-  --ensemblemodifyretries <value>
+  --framework-name <value>
+        Mesos framework name. Defaults to exhibitor. Optional
+  --framework-timeout <value>
+        Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional
+  --storage <value>
+        Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Defaults to file:exhibitor-mesos.json. Optional.
+  --ensemble-modify-retries <value>
         Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.
-  --ensemblemodifybackoff <value>
+  --ensemble-modify-backoff <value>
         Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.
   -d <value> | --debug <value>
         Debug mode. Optional. Defaults to false.
-
 ```
 
 Run the scheduler
