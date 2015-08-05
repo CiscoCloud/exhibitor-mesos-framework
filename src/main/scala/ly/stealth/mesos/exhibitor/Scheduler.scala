@@ -209,8 +209,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       val updatedServersSpec = (s"S:${server.config.id}:${server.config.hostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
         srv.split(":") match {
-          case Array(_, _, serverHost) if serverHost == server.config.hostname => servers
-          case Array(_, _, serverHost) => srv :: servers
+          // ignore duplicate ids or unknown instances
+          case Array(_, id, _) if id == server.id || !cluster.contains(id) => servers
+          case Array(_, _, _) => srv :: servers
           case _ => servers
         }
       }).sorted.mkString(",")

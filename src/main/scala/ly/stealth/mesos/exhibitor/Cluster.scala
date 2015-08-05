@@ -42,6 +42,8 @@ case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
     }
   }
 
+  def contains(id: String): Boolean = servers.exists(_.id == id)
+
   def expandIds(expr: String): List[String] = {
     if (expr == null || expr == "") throw new IllegalArgumentException("ID expression cannot be null or empty")
     else {
