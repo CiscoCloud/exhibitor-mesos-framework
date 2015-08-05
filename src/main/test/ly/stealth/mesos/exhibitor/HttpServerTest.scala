@@ -104,9 +104,9 @@ class HttpServerTest extends MesosTestCase {
   def startStopServer() {
     sendRequest("/add", parseMap("id=0"))
 
-    val startResponse = sendRequest("/start", parseMap("id=0")).as[ApiResponse]
+    val startResponse = sendRequest("/start", parseMap("id=0,timeout=0ms")).as[ApiResponse]
     assertTrue(startResponse.success)
-    assertTrue(startResponse.message.contains("Started servers"))
+    assertTrue(startResponse.message.contains("scheduled"))
     assertNotEquals(None, startResponse.value)
     assertEquals(ExhibitorServer.Stopped, startResponse.value.get.servers.head.state)
 

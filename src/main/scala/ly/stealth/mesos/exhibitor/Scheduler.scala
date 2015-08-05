@@ -140,7 +140,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
-        onServerStarted(server, driver, status)
+        new Thread {
+          override def run() {
+            onServerStarted(server, driver, status)
+          }
+        }.start()
       case TaskState.TASK_LOST | TaskState.TASK_FAILED | TaskState.TASK_ERROR =>
         onServerFailed(server, status)
       case TaskState.TASK_FINISHED | TaskState.TASK_KILLED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
@@ -154,8 +158,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         this.synchronized {
           if (server.state != ExhibitorServer.Running) {
             logger.info(s"Adding server ${server.id} to ensemble")
-            addToEnsemble(server)
             server.state = ExhibitorServer.Running
+            addToEnsemble(server)
           }
         }
       case None =>
