@@ -29,6 +29,7 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 
 case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var ports: List[Range] = Nil)
 
@@ -115,6 +116,17 @@ case class ExhibitorServer(id: String) {
     }
 
     None
+  }
+
+  def waitFor(state: ExhibitorServer.State, timeout: Duration): Boolean = {
+    var t = timeout.toMillis
+    while (t > 0 && this.state != state) {
+      val delay = Math.min(100, t)
+      Thread.sleep(delay)
+      t -= delay
+    }
+
+    this.state == state
   }
 
   private[exhibitor] def newExecutor(id: String): ExecutorInfo = {

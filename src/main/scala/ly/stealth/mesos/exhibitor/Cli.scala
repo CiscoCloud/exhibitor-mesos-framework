@@ -35,7 +35,7 @@ object Cli {
     try {
       exec(args)
     } catch {
-      case e: CliError =>
+      case e: Throwable =>
         System.err.println("Error: " + e.getMessage)
         sys.exit(1)
     }
@@ -122,6 +122,8 @@ object Cli {
         resolveApi(config.get("api"))
 
         val response = sendRequest("/start", config).as[ApiResponse]
+        if (!response.success) throw CliError(response.message)
+
         printLine(response.message)
         printLine()
         response.value.foreach(printCluster)
@@ -376,7 +378,12 @@ object Cli {
       }
     }
 
-    val start = defaultParser("start <id>")
+    val start = new CliOptionParser("start <id>") {
+      opt[String]("timeout").optional().text("Time to wait for server to be started. Should be a parsable Scala Duration value. Defaults to 60s. Optional").action { (value, config) =>
+        Duration(value)
+        config.updated("timeout", value)
+      }
+    }
 
     val stop = defaultParser("stop <id>")
 

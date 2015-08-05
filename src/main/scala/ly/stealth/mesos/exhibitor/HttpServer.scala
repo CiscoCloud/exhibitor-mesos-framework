@@ -28,6 +28,7 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool
 import play.api.libs.json._
 
 import scala.collection.JavaConversions._
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 case class ApiResponse(success: Boolean, message: String, value: Option[Cluster])
@@ -175,6 +176,7 @@ object HttpServer {
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
       val idExpr = request.getParameter("id")
       val ids = Scheduler.cluster.expandIds(idExpr)
+      val timeout = Duration(Option(request.getParameter("timeout")).getOrElse("60s"))
 
       val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
@@ -187,7 +189,12 @@ object HttpServer {
           } else logger.warn(s"Server $id already started")
           server
         }
-        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(servers)))))
+
+        if (timeout.toMillis > 0) {
+          val ok = servers.forall(_.waitFor(ExhibitorServer.Running, timeout))
+          if (ok) response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(servers)))))
+          else response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Start servers $idExpr timed out after $timeout", None)))
+        } else response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Servers $idExpr scheduled to start", Some(Cluster(servers)))))
       }
     }
 

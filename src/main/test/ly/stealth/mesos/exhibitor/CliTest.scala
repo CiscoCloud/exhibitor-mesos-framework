@@ -121,9 +121,27 @@ class CliTest extends MesosTestCase {
     server0.task = ExhibitorServer.Task("exhibitor-0-slave0-31000", "", "", Map())
     Scheduler.cluster.servers += server0
 
-    exec("start 0")
-    assertContains("Started server")
-    assertContains("id: 0")
+    exec("start 0 --timeout 0ms")
+    assertContains("scheduled")
+    assertContains("0")
+    assertEquals(server0.state, ExhibitorServer.Stopped)
+
+    exec("stop 0")
+    assertContains("Stopped servers 0")
+    assertEquals(server0.state, ExhibitorServer.Added)
+  }
+
+  @Test
+  def startStopTimeout() {
+    val server0 = ExhibitorServer("0")
+    server0.task = ExhibitorServer.Task("exhibitor-0-slave0-31000", "", "", Map())
+    Scheduler.cluster.servers += server0
+
+    Try(exec("start 0 --timeout 1ms")) match {
+      case Failure(e) if e.isInstanceOf[CliError] => assertTrue(e.getMessage, e.getMessage.contains("timed out"))
+      case other => fail(other.toString)
+    }
+
     assertEquals(server0.state, ExhibitorServer.Stopped)
 
     exec("stop 0")
