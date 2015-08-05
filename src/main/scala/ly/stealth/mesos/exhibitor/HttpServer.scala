@@ -169,6 +169,8 @@ object HttpServer {
           Scheduler.cluster.addServer(server)
           server
         }
+
+        Scheduler.cluster.save()
         response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Added servers $idExpr", Some(Cluster(servers)))))
       }
     }
@@ -206,6 +208,7 @@ object HttpServer {
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.flatMap(Scheduler.stopServer)
+        Scheduler.cluster.save()
         response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Stopped servers $idExpr", Some(Cluster(servers)))))
       }
     }
@@ -218,6 +221,7 @@ object HttpServer {
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.flatMap(Scheduler.removeServer)
+        Scheduler.cluster.save()
         response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Removed servers $idExpr", Some(Cluster(servers)))))
       }
     }
@@ -252,6 +256,8 @@ object HttpServer {
           }
           server
         }
+
+        Scheduler.cluster.save()
         response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Updated configuration for servers $idExpr", Some(Cluster(servers)))))
       }
     }
