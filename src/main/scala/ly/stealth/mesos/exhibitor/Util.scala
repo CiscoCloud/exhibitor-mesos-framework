@@ -155,68 +155,17 @@ object Util {
       new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX").format(date)
     }
 
-    def framework(framework: FrameworkInfo): String = {
-      var s = ""
+    def framework(framework: FrameworkInfo): String = "%s name: %s host: %s failover_timeout: %.2f".format(id(framework.getId.getValue), framework.getName, framework.getHostname, framework.getFailoverTimeout)
 
-      s += id(framework.getId.getValue)
-      s += " name: " + framework.getName
-      s += " host: " + framework.getHostname
-      s += " failover_timeout: " + framework.getFailoverTimeout
+    def master(master: MasterInfo): String = "%s pid: %s host: %s".format(id(master.getId), master.getId, master.getHostname)
 
-      s
-    }
+    def slave(slave: SlaveInfo): String = "%s host: %s port: %d %s".format(id(slave.getId.getValue), slave.getHostname, slave.getPort, resources(slave.getResourcesList))
 
-    def master(master: MasterInfo): String = {
-      var s = ""
+    def offer(offer: Offer): String = "%s%s %s %s".format(offer.getHostname, id(offer.getId.getValue), resources(offer.getResourcesList), attributes(offer.getAttributesList))
 
-      s += id(master.getId)
-      s += " pid:" + master.getPid
-      s += " host:" + master.getHostname
+    def offers(offers: Iterable[Offer]): String = offers.map(Str.offer).mkString("\n")
 
-      s
-    }
-
-    def slave(slave: SlaveInfo): String = {
-      var s = ""
-
-      s += id(slave.getId.getValue)
-      s += " host:" + slave.getHostname
-      s += " port:" + slave.getPort
-      s += " " + resources(slave.getResourcesList)
-
-      s
-    }
-
-    def offer(offer: Offer): String = {
-      var s = ""
-
-      s += offer.getHostname + id(offer.getId.getValue)
-      s += " " + resources(offer.getResourcesList)
-      s += " " + attributes(offer.getAttributesList)
-
-      s
-    }
-
-    def offers(offers: Iterable[Offer]): String = {
-      var s = ""
-
-      for (offer <- offers)
-        s += (if (s.isEmpty) "" else "\n") + Str.offer(offer)
-
-      s
-    }
-
-    def task(task: TaskInfo): String = {
-      var s = ""
-
-      s += task.getTaskId.getValue
-      s += " slave:" + id(task.getSlaveId.getValue)
-
-      s += " " + resources(task.getResourcesList)
-      s += " data:" + new String(task.getData.toByteArray)
-
-      s
-    }
+    def task(task: TaskInfo): String = "%s slave: %s %s data: %s".format(task.getTaskId.getValue, id(task.getSlaveId.getValue), resources(task.getResourcesList), new String(task.getData.toByteArray))
 
     def resources(resources: util.List[Protos.Resource]): String = {
       var s = ""
