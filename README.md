@@ -168,16 +168,16 @@ cluster:
     port: auto
 ```
 
-Now lets start the server. The state should change from `Added` to `Stopped` meaning the task is waiting for resources to be offered.
+Now lets start the server. This call to CLI will block until the server is actually started but will wait no more than a configured timeout. Timeout can be passed via `--timeout` flag and defaults to `60s`. If a timeout of `0ms` is passed CLI won't wait for servers to start at all and will reply with "Scheduled servers ..." message.
 
 ```
-# ./exhibitor-mesos.sh start 0
+# ./exhibitor-mesos.sh start 0 --timeout 30s
 Started servers 0
 
 cluster:
   server:
     id: 0
-    state: Stopped
+    state: Running
     constraints: hostname=unique
     exhibitor config:
       zkconfigzpath: /exhibitor/config
