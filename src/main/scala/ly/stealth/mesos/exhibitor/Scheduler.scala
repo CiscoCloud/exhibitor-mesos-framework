@@ -35,12 +35,11 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() {
-        if (driver != null) driver.stop()
+        HttpServer.stop()
       }
     })
 
     val status = if (driver.run eq Status.DRIVER_STOPPED) 0 else 1
-    HttpServer.stop()
     sys.exit(status)
   }
 

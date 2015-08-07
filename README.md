@@ -12,6 +12,7 @@ This is still being developed actively and is not yet alpha. [Open issues here](
 [Typical Operations](#typical-operations)  
 * [Running scheduler in Marathon](https://github.com/CiscoCloud/exhibitor-mesos-framework/tree/master/src/marathon)   
 * [Changing the location of Zookeeper data](#changing-the-location-of-zookeeper-data)
+* [Shutting down framework](#shutting-down-framework)
 
 [Navigating the CLI](#navigating-the-cli)  
 * [Requesting help](#requesting-help)  
@@ -259,6 +260,15 @@ cluster:
     mem: 256.0
     sharedConfigChangeBackoff: 10000
     port: auto
+```
+
+Shutting down framework
+-----------------------
+
+While the scheduler has a shutdown hook it doesn't actually finish the framework. To shutdown the framework completely (e.g. unregister it in Mesos) you may shoot a `POST` to `/teardown` specifying the framework id to shutdown:
+
+```
+# curl -d frameworkId=20150807-094500-84125888-5050-14187-0005 -X POST http://master:5050/teardown
 ```
 
 Navigating the CLI
