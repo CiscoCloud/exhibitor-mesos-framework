@@ -129,6 +129,8 @@ case class ExhibitorServer(id: String) {
     this.state == state
   }
 
+  def isReconciling: Boolean = this.state == ExhibitorServer.Reconciling
+
   private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
     val java = "$(find jdk* -maxdepth 0 -type d)" // find non-recursively a directory starting with "jdk"
     val cmd = s"export PATH=$$MESOS_DIRECTORY/$java/bin:$$PATH && java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} ly.stealth.mesos.exhibitor.Executor"
@@ -169,6 +171,14 @@ case class ExhibitorServer(id: String) {
 }
 
 object ExhibitorServer {
+
+  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String])
+
+  object Task {
+    implicit val writer = Json.writes[Task]
+    implicit val reader = Json.reads[Task]
+  }
+
   def nextTaskId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
 
   def idFromTaskId(taskId: String): String = {
@@ -188,11 +198,14 @@ object ExhibitorServer {
 
   case object Running extends State
 
+  case object Reconciling extends State
+
   implicit val writer = new Writes[ExhibitorServer] {
     def writes(es: ExhibitorServer): JsValue = {
       Json.obj(
         "id" -> es.id,
         "state" -> es.state.toString,
+        "task" -> Option(es.task),
         "constraints" -> Util.formatConstraints(es.constraints),
         "config" -> es.config
       )
@@ -202,15 +215,18 @@ object ExhibitorServer {
   implicit val reader = (
     (__ \ 'id).read[String] and
       (__ \ 'state).read[String] and
+      (__ \ 'task).readNullable[Task] and
       (__ \ 'constraints).read[String].map(Constraint.parse) and
-      (__ \ 'config).read[TaskConfig])((id, state, constraints, config) => {
+      (__ \ 'config).read[TaskConfig])((id, state, task, constraints, config) => {
     val server = ExhibitorServer(id)
     state match {
       case "Added" => server.state = Added
       case "Stopped" => server.state = Stopped
       case "Staging" => server.state = Staging
       case "Running" => server.state = Running
+      case "Reconciling" => server.state = Reconciling
     }
+    server.task = task.orNull
     constraints.foreach(server.constraints += _)
     config.exhibitorConfig.foreach(server.config.exhibitorConfig += _)
     config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
@@ -221,7 +237,4 @@ object ExhibitorServer {
     server.config.ports = config.ports
     server
   })
-
-  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String])
-
 }

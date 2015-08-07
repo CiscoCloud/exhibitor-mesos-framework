@@ -2,6 +2,7 @@ package ly.stealth.mesos.exhibitor
 
 import java.util
 import java.util.concurrent.TimeUnit
+import java.util.{Collections, Date}
 
 import ly.stealth.mesos.exhibitor.Util.Str
 import org.apache.log4j._
@@ -9,6 +10,8 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 
 import scala.collection.JavaConversions._
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 object Scheduler extends org.apache.mesos.Scheduler {
@@ -50,6 +53,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.save()
 
     this.driver = driver
+    reconcileTasks(force = true)
   }
 
   override def offerRescinded(driver: SchedulerDriver, id: OfferID) {
@@ -66,6 +70,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     logger.info("[reregistered] master:" + Str.master(master))
 
     this.driver = driver
+    reconcileTasks(force = true)
   }
 
   override def slaveLost(driver: SchedulerDriver, id: SlaveID) {
@@ -104,6 +109,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
+    reconcileTasks()
     Scheduler.cluster.save()
   }
 
@@ -184,6 +190,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
       server.state = ExhibitorServer.Added
+      server.task = null
       server
     }
   }
@@ -296,6 +303,41 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
 
     cluster.servers.filter(_.task != null).flatMap(value(_, name)).toList
+  }
+
+  private[exhibitor] val RECONCILE_DELAY = 10 seconds
+  private[exhibitor] val RECONCILE_MAX_TRIES = 3
+
+  private[exhibitor] var reconciles = 0
+  private[exhibitor] var reconcileTime = new Date(0)
+
+  private[exhibitor] def reconcileTasks(force: Boolean = false, now: Date = new Date()) {
+    if (now.getTime - reconcileTime.getTime >= RECONCILE_DELAY.toMillis) {
+      if (!cluster.isReconciling) reconciles = 0
+      reconciles += 1
+      reconcileTime = now
+
+      if (reconciles > RECONCILE_MAX_TRIES) {
+        cluster.servers.filter(s => s.isReconciling && s.task != null).foreach { server =>
+          logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for server ${server.id}, sending killTask for task ${server.task.id}")
+          driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
+          server.task = null
+        }
+      } else {
+        val statuses = cluster.servers.filter(_.task != null).flatMap { server =>
+          if (force || server.isReconciling) {
+            server.state = ExhibitorServer.Reconciling
+            logger.info(s"Reconciling $reconciles/$RECONCILE_MAX_TRIES state of server ${server.id}, task ${server.task.id}")
+            Some(TaskStatus.newBuilder()
+              .setTaskId(TaskID.newBuilder().setValue(server.task.id))
+              .setState(TaskState.TASK_STAGING)
+              .build)
+          } else None
+        }.toList
+
+        if (force || statuses.nonEmpty) driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
+      }
+    }
   }
 
   private def initLogging() {

@@ -59,9 +59,11 @@ case class Cluster(exhibitorServers: List[ExhibitorServer] = Nil) {
   def load() {
     storage.load(Cluster.reader).foreach { cluster =>
       this.frameworkId = cluster.frameworkId
-      //TODO load servers too
+      cluster.servers.foreach(this.servers += _)
     }
   }
+
+  def isReconciling: Boolean = servers.exists(_.isReconciling)
 
   override def toString: String = servers.toString()
 }
