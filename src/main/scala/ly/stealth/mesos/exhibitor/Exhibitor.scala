@@ -40,6 +40,10 @@ trait IExhibitor {
 }
 
 class Exhibitor extends IExhibitor {
+  private final val ZK_DATA_DIR = new File("./zkdata")
+  private final val ZK_LOG_DIR = new File("./zklog")
+  private final val ZK_LOG_INDEX_DIR = new File("./zklogindex")
+
   private val logger = Logger.getLogger(classOf[Exhibitor])
   @volatile var server: AnyRef = null
 
@@ -98,16 +102,29 @@ class Exhibitor extends IExhibitor {
             logger.debug("Shared configuration changed, applying changes")
             sharedConfig = newConfig
 
-            if (sharedConfig.zookeeperInstallDirectory != "") {
-              new File(sharedConfig.zookeeperInstallDirectory).delete() //remove symlink if already exists
-              Files.createSymbolicLink(Paths.get(sharedConfig.zookeeperInstallDirectory), Paths.get(findZookeeperDist.toURI)) //create a new symlink
-            }
+            applyChanges()
           }
 
           Thread.sleep(config.sharedConfigChangeBackoff)
         }
       }
     }.start()
+  }
+
+  private def applyChanges() {
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperInstallDirectory, findZookeeperDist)
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_DIR)
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_DIR)
+    createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_DIR)
+  }
+
+  private def createSymlinkIfNotEmpty(link: String, target: File) {
+    if (link != "") {
+      logger.debug(s"Creating symbolic link $link to ${Paths.get(target.toURI)}")
+      target.mkdirs() //create directories if they do not exist yet
+      new File(link).delete() //remove symlink if already exists
+      Files.createSymbolicLink(Paths.get(link), Paths.get(target.toURI)) //create a new symlink
+    }
   }
 
   private def findZookeeperDist: File = {
@@ -175,8 +192,8 @@ case class Ports(client: Int, connect: Int, election: Int)
 object Ports {
   implicit val reader = (
     (__ \ 'clientPort).read[Int] and
-    (__ \ 'connectPort).read[Int] and
-    (__ \ 'electionPort).read[Int])(Ports.apply _)
+      (__ \ 'connectPort).read[Int] and
+      (__ \ 'electionPort).read[Int])(Ports.apply _)
 }
 
 case class SharedConfig(logIndexDirectory: String, zookeeperInstallDirectory: String, zookeeperDataDirectory: String,
