@@ -379,6 +379,10 @@ object Cli {
     }
 
     val start = new CliOptionParser("start <id>") {
+      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
+        config.updated("api", value)
+      }
+
       opt[String]("timeout").optional().text("Time to wait for server to be started. Should be a parsable Scala Duration value. Defaults to 60s. Optional").action { (value, config) =>
         Duration(value)
         config.updated("timeout", value)
