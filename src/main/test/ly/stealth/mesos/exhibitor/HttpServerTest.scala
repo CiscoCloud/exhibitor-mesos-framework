@@ -83,7 +83,7 @@ class HttpServerTest extends MesosTestCase {
     sendRequest("/add", parseMap("id=1"))
     sendRequest("/add", parseMap("id=2"))
 
-    val response = sendRequest("/status", Map()).as[ApiResponse]
+    val response = sendRequest("/status", Map()).as[ClusterStatusResponse]
     assertTrue(response.success)
     assertNotEquals(None, response.value)
     assertEquals(3, response.value.get.servers.size)

@@ -340,6 +340,33 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  /**
+   * Get Exhibitor cluster view for each of the exhibitor-on-mesos servers
+   */
+  def getClusterStatus: ClusterStatus = {
+    val mesosServerStatuses =
+      cluster.servers.map { server =>
+        val clusterViewOpt =
+          server.state match {
+            case ExhibitorServer.Running =>
+              Try(ExhibitorAPI.getClusterStatus(server.url)) match {
+                case Success(exhibitorClusterStateView) =>
+                  Some(exhibitorClusterStateView)
+                case Failure(e) =>
+                  logger.error(s"Failed to get exhibitor cluster view for server ${server.id}", e)
+                  None
+              }
+            case _ =>
+              logger.debug(s"Server ${server.id} is in state ${server.id}, only RUNNING servers may request " +
+                s"exhibitor API to get cluster state")
+              None
+          }
+        ExhibitorOnMesosServerStatus(server, clusterViewOpt)
+      }
+
+    ClusterStatus(mesosServerStatuses)
+  }
+
   private def initLogging() {
     System.setProperty("org.eclipse.jetty.util.log.class", classOf[JettyLog4jLogger].getName)
 

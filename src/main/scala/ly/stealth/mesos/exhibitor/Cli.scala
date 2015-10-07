@@ -162,8 +162,8 @@ object Cli {
       case Some(config) =>
         resolveApi(config.get("api"))
 
-        val cluster = sendRequest("/status", config).as[ApiResponse]
-        printCluster(cluster.value.get)
+        val clusterStatus = sendRequest("/status", config).as[ClusterStatusResponse]
+        printClusterStatus(clusterStatus.value.get)
       case None => throw CliError("Invalid arguments")
     }
   }
@@ -271,10 +271,16 @@ object Cli {
 
   private def printCluster(cluster: Cluster) {
     printLine("cluster:")
-    cluster.servers.foreach(printExhibitorServer(_, 1))
+    cluster.servers.foreach(s => printExhibitorServer(s, None, 1))
   }
 
-  private def printExhibitorServer(server: ExhibitorServer, indent: Int = 0) {
+  private def printClusterStatus(clusterStatus: ClusterStatus) {
+    printLine("cluster:")
+    clusterStatus.serverStatuses.foreach(ss =>
+      printExhibitorServer(ss.server, ss.exhibitorClusterView, 1))
+  }
+
+  private def printExhibitorServer(server: ExhibitorServer, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]], indent: Int = 0) {
     printLine("server:", indent)
     printLine(s"id: ${server.id}", indent + 1)
     printLine(s"state: ${server.state}", indent + 1)
@@ -284,7 +290,20 @@ object Cli {
     if (server.constraints.nonEmpty)
       printLine(s"constraints: ${Util.formatConstraints(server.constraints)}", indent + 1)
     printTaskConfig(server.config, indent + 1)
+    exhibitorClusterView.foreach(x => printExhibitorClusterStateView(x, indent + 1))
+
     printLine()
+  }
+
+  private def printExhibitorClusterStateView(statuses: Seq[ExhibitorServerStatus], indent: Int): Unit = {
+    printLine("exhibitor cluster view:", indent)
+    val statusString = statuses.sortBy(_.hostname).map{
+      s =>
+        val lof =  if (s.isLeader) "L" else "F"
+        s"[${s.hostname}, ${s.description}, ${s.code}, $lof]"
+    }.mkString("; ")
+
+    printLine(statusString, indent + 1)
   }
 
   private def printTaskConfig(config: TaskConfig, indent: Int) {
