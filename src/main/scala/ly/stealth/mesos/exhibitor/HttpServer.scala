@@ -88,7 +88,7 @@ object HttpServer {
       if (file.getName.matches(jarMask)) jar = file
       if (file.getName.matches(exhibitorMask)) exhibitorDist = file
       if (file.getName.matches(zookeeperMask) && !file.isDirectory) zookeeperDist = file
-      if (file.getName.matches(jdkMask)) jdkDist = file
+      if (file.getName.matches(jdkMask) && !file.isDirectory) jdkDist = file
     }
 
     if (jar == null) throw new IllegalStateException(jarMask + " not found in current dir")
