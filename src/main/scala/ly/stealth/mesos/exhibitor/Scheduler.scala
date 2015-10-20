@@ -179,7 +179,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private def onServerFailed(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
     serverOpt match {
-      case Some(server) => server.state = ExhibitorServer.Stopped
+      case Some(server) =>
+        server.state = ExhibitorServer.Stopped
+        server.task = null
+        server.config.hostname = ""
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }
   }
