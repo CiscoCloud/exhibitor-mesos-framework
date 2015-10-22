@@ -154,7 +154,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         }.start()
       case TaskState.TASK_LOST | TaskState.TASK_FAILED | TaskState.TASK_ERROR =>
         onServerFailed(server, status)
-      case TaskState.TASK_FINISHED | TaskState.TASK_KILLED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
+      case TaskState.TASK_FINISHED | TaskState.TASK_KILLED =>
+        onServerFinished(server, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
 
@@ -187,13 +188,23 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  private def onServerFinished(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
+    serverOpt match {
+      case Some(server) =>
+        server.state = ExhibitorServer.Added
+        server.task = null
+        server.config.hostname = ""
+        logger.info(s"Task ${status.getTaskId.getValue} has finished")
+      case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
+    }
+  }
+
   private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
       if (server.state == ExhibitorServer.Staging || server.state == ExhibitorServer.Running)
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
       server.state = ExhibitorServer.Added
-      server.task = null
       server
     }
   }
@@ -320,11 +331,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
       reconciles += 1
       reconcileTime = now
 
+      cluster.servers.foreach(s => if (s.task == null && s.state == ExhibitorServer.Running) s.state = ExhibitorServer.Stopped)
+
       if (reconciles > RECONCILE_MAX_TRIES) {
         cluster.servers.filter(s => s.isReconciling && s.task != null).foreach { server =>
           logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for server ${server.id}, sending killTask for task ${server.task.id}")
           driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
-          server.task = null
         }
       } else {
         val statuses = cluster.servers.filter(_.task != null).flatMap { server =>
