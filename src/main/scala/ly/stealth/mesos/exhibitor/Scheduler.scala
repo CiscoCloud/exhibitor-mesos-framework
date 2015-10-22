@@ -16,6 +16,7 @@ import scala.util.{Failure, Success, Try}
 
 object Scheduler extends org.apache.mesos.Scheduler {
   private val logger = Logger.getLogger(this.getClass)
+  private val ensembleLock = new Object()
 
   private[exhibitor] val cluster = Cluster()
   private var driver: SchedulerDriver = null
@@ -154,7 +155,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         }.start()
       case TaskState.TASK_LOST | TaskState.TASK_FAILED | TaskState.TASK_ERROR =>
         onServerFailed(server, status)
-      case TaskState.TASK_FINISHED | TaskState.TASK_KILLED => logger.info(s"Task ${status.getTaskId.getValue} has finished")
+      case TaskState.TASK_FINISHED | TaskState.TASK_KILLED =>
+        onServerFinished(server, status)
       case _ => logger.warn("Got unexpected task state: " + status.getState)
     }
 
@@ -166,7 +168,6 @@ object Scheduler extends org.apache.mesos.Scheduler {
       case Some(server) =>
         this.synchronized {
           if (server.state != ExhibitorServer.Running) {
-            logger.info(s"Adding server ${server.id} to ensemble")
             server.state = ExhibitorServer.Running
             addToEnsemble(server)
           }
@@ -187,13 +188,23 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
+  private def onServerFinished(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
+    serverOpt match {
+      case Some(server) =>
+        server.state = ExhibitorServer.Added
+        server.task = null
+        server.config.hostname = ""
+        logger.info(s"Task ${status.getTaskId.getValue} has finished")
+      case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
+    }
+  }
+
   private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
     cluster.getServer(id).map { server =>
       if (server.state == ExhibitorServer.Staging || server.state == ExhibitorServer.Running)
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
       server.state = ExhibitorServer.Added
-      server.task = null
       server
     }
   }
@@ -230,7 +241,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }).sorted.mkString(",")
 
       Try(ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), server.url)) match {
-        case Success(_) =>
+        case Success(_) => logger.info(s"Successfully added server ${server.id} to ensemble")
         case Failure(e) =>
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
           if (retriesLeft > 0) {
@@ -241,7 +252,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
-    tryAddToEnsemble(Config.ensembleModifyRetries)
+    new Thread {
+      override def run() {
+        ensembleLock.synchronized {
+          logger.info(s"Adding server ${server.id} to ensemble")
+          tryAddToEnsemble(Config.ensembleModifyRetries)
+        }
+      }
+    }.start()
   }
 
   private def removeFromEnsemble(server: ExhibitorServer) {
@@ -268,10 +286,16 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }
     }
 
-    cluster.servers.find(_.state == ExhibitorServer.Running) match {
-      case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
-      case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
-    }
+    new Thread {
+      override def run() {
+        ensembleLock.synchronized {
+          cluster.servers.find(_.state == ExhibitorServer.Running) match {
+            case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
+            case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
+          }
+        }
+      }
+    }.start()
   }
 
   private def getSharedConfig(server: ExhibitorServer, retries: Int): SharedConfig = {
@@ -320,11 +344,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
       reconciles += 1
       reconcileTime = now
 
+      cluster.servers.foreach(s => if (s.task == null && s.state == ExhibitorServer.Running) s.state = ExhibitorServer.Stopped)
+
       if (reconciles > RECONCILE_MAX_TRIES) {
         cluster.servers.filter(s => s.isReconciling && s.task != null).foreach { server =>
           logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for server ${server.id}, sending killTask for task ${server.task.id}")
           driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
-          server.task = null
         }
       } else {
         val statuses = cluster.servers.filter(_.task != null).flatMap { server =>
