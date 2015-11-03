@@ -238,3 +238,43 @@ object ExhibitorServer {
     server
   })
 }
+
+
+/**
+ * @param server Exhibitor-on-mesos server instance
+ * @param exhibitorClusterView a holder for Exhibitor's /status endpoint response - the view of the Exhibitor cluster
+ * status from the particular node
+ */
+case class ExhibitorOnMesosServerStatus(server: ExhibitorServer, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]])
+object ExhibitorOnMesosServerStatus{
+
+  implicit val writer = new Writes[ExhibitorOnMesosServerStatus] {
+    def writes(emss: ExhibitorOnMesosServerStatus): JsValue = {
+      Json.obj(
+        "server" -> emss.server,
+        "exhibitorClusterView" -> emss.exhibitorClusterView
+      )
+    }
+  }
+
+  implicit val reader = (
+    (__ \ 'server).read[ExhibitorServer] and
+      (__ \ 'exhibitorClusterView).read[Option[Seq[ExhibitorServerStatus]]])(ExhibitorOnMesosServerStatus.apply _)
+}
+
+case class ClusterStatus(serverStatuses: Seq[ExhibitorOnMesosServerStatus]){
+  val servers = serverStatuses.map(_.server)
+}
+
+object ClusterStatus{
+
+  implicit val writer = new Writes[ClusterStatus] {
+    def writes(cs: ClusterStatus): JsValue = {
+      Json.obj(
+        "serverStatuses" -> cs.serverStatuses
+      )
+    }
+  }
+
+  implicit val reader = (__ \ 'serverStatuses).read[Seq[ExhibitorOnMesosServerStatus]].map{ l => ClusterStatus(l) }
+}

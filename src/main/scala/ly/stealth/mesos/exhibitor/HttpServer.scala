@@ -37,6 +37,13 @@ object ApiResponse {
   implicit val format = Json.format[ApiResponse]
 }
 
+case class ClusterStatusResponse(success: Boolean, message: String, value: Option[ClusterStatus])
+
+object ClusterStatusResponse{
+  implicit val format = Json.format[ClusterStatusResponse]
+}
+
+
 object HttpServer {
   private val logger = Logger.getLogger(HttpServer.getClass)
   private var server: Server = null
@@ -227,7 +234,7 @@ object HttpServer {
     }
 
     private def handleClusterStatus(request: HttpServletRequest, response: HttpServletResponse) {
-      response.getWriter.println(Json.toJson(ApiResponse(success = true, "", Some(Scheduler.cluster))))
+      response.getWriter.println(Json.toJson(ClusterStatusResponse(success = true, "", Some(Scheduler.getClusterStatus))))
     }
 
     private val exhibitorConfigs = Set("configtype", "configcheckms", "defaultconfig", "headingtext", "hostname", "jquerystyle", "loglines", "nodemodification",

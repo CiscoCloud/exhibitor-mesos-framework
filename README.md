@@ -215,7 +215,14 @@ cluster:
     mem: 256.0
     sharedConfigChangeBackoff: 10000
     port: auto
+    exhibitor cluster view:
+          [slave0, latent, 0, F]
 ```
+
+(NOTE: with `exhibitor cluster view` section you can reason about underlying Exhibitor and Zookeeper ensemble.
+Since there is some synchronisation lag in Exhibitor when the node is added/removed, the view of the cluster may 
+be different from different nodes, that's why this section is shown under all nodes that are in the RUNNING state)
+
 
 By now you should have a single Exhibitor instance running. Here's how you stop it:
 

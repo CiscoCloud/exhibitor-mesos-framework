@@ -256,11 +256,32 @@ object SharedConfig {
   }
 }
 
+case class ExhibitorServerStatus(hostname: String, isLeader: Boolean, description: String, code: Int)
+
+object ExhibitorServerStatus {
+  implicit val reader = (
+    (__ \ 'hostname).read[String] and
+      (__ \ 'isLeader).read[Boolean] and
+      (__ \ 'description).read[String] and
+      (__ \ 'code).read[Int])(ExhibitorServerStatus.apply _)
+
+  implicit val writer = new Writes[ExhibitorServerStatus] {
+    def writes(ess: ExhibitorServerStatus): JsValue = {
+      Json.obj(
+        "hostname" -> ess.hostname,
+        "isLeader" -> ess.isLeader,
+        "description" -> ess.description,
+        "code" -> ess.code)
+    }
+  }
+}
+
 object ExhibitorAPI {
   private val logger = Logger.getLogger(ExhibitorAPI.getClass)
 
   private val getSystemStateURL = "exhibitor/v1/config/get-state"
   private val setConfigURL = "exhibitor/v1/config/set"
+  private val getStatus = "exhibitor/v1/cluster/status"
 
   def getSystemState(baseUrl: String): SharedConfig = {
     val url = s"$baseUrl/$getSystemStateURL"
@@ -298,6 +319,21 @@ object ExhibitorAPI {
       readResponse(connection, response => {
         Json.parse(response).validate[Result] match {
           case JsSuccess(result, _) => if (!result.succeeded) throw new IllegalStateException(result.message)
+          case JsError(error) => throw new IllegalStateException(error.toString())
+        }
+      })
+    } finally {
+      connection.disconnect()
+    }
+  }
+
+  def   getClusterStatus(baseUrl: String): Seq[ExhibitorServerStatus] = {
+    val url = s"$baseUrl/$getStatus"
+    val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+    try {
+      readResponse(connection, response => {
+        Json.parse(response).validate[Seq[ExhibitorServerStatus]] match {
+          case JsSuccess(serverStatuses, _) => serverStatuses
           case JsError(error) => throw new IllegalStateException(error.toString())
         }
       })
