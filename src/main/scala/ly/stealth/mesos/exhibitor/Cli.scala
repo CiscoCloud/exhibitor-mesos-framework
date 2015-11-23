@@ -88,7 +88,7 @@ object Cli {
         resolveApi(config.get("api"))
 
         Config.master = config("master")
-        Config.user = config("user")
+        config.get("user").foreach(user => Config.user = user)
         config.get("framework-name").foreach(name => Config.frameworkName = name)
         config.get("framework-timeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
         config.get("storage").foreach(storage => Config.storage = storage)
@@ -335,7 +335,7 @@ object Cli {
         config.updated("api", value)
       }
 
-      opt[String]('u', "user").required().text("Mesos user. Required.").action { (value, config) =>
+      opt[String]('u', "user").optional().text("Mesos user. Defaults to current system user.").action { (value, config) =>
         config.updated("user", value)
       }
 
