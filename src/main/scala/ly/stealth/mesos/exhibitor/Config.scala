@@ -27,7 +27,7 @@ object Config {
   var debug: Boolean = false
 
   var master: String = null
-  var user: String = null
+  var user: String = ""
 
   var api: String = null
 
