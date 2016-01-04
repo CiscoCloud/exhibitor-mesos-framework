@@ -1,8 +1,6 @@
 Exhibitor Mesos Framework
 ======================
 
-This is still being developed actively and is not yet alpha. [Open issues here](https://github.com/CiscoCloud/exhibitor-mesos-framework/issues).
-
 [Prerequisites](#prerequisites)  
 * [Environment Configuration](#environment-configuration)  
 * [Scheduler Configuration](#scheduler-configuration)  
@@ -462,3 +460,5 @@ Usage: remove <id> [options]
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
 ```
+
+[Open issues here](https://github.com/CiscoCloud/exhibitor-mesos-framework/issues).
