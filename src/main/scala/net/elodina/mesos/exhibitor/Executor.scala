@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.io.{PrintWriter, StringWriter}
 
-import ly.stealth.mesos.exhibitor.Util.Str
 import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
@@ -40,11 +39,11 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   def registered(driver: ExecutorDriver, executor: ExecutorInfo, framework: FrameworkInfo, slave: SlaveInfo) {
-    logger.info("[registered] framework:" + Str.framework(framework) + " slave:" + Str.slave(slave))
+    logger.info("[registered] framework:" + Util.Str.framework(framework) + " slave:" + Util.Str.slave(slave))
   }
 
   def reregistered(driver: ExecutorDriver, slave: SlaveInfo) {
-    logger.info("[reregistered] " + Str.slave(slave))
+    logger.info("[reregistered] " + Util.Str.slave(slave))
   }
 
   def disconnected(driver: ExecutorDriver) {
@@ -52,7 +51,7 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   def launchTask(driver: ExecutorDriver, task: TaskInfo) {
-    logger.info("[launchTask] " + Str.task(task))
+    logger.info("[launchTask] " + Util.Str.task(task))
 
     new Thread {
       override def run() {

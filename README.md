@@ -8,7 +8,7 @@ Exhibitor Mesos Framework
 * [Quick start](#quick-start)  
 
 [Typical Operations](#typical-operations)  
-* [Running scheduler in Marathon](https://github.com/CiscoCloud/exhibitor-mesos-framework/tree/master/src/marathon)   
+* [Running scheduler in Marathon](https://github.com/elodina/exhibitor-mesos-framework/tree/master/src/marathon)   
 * [Changing the location of Zookeeper data](#changing-the-location-of-zookeeper-data)
 * [Shutting down framework](#shutting-down-framework)
 
@@ -30,7 +30,7 @@ Prerequisites
 
 Clone and build the project
 
-    # git clone https://github.com/CiscoCloud/exhibitor-mesos-framework.git
+    # git clone https://github.com/elodina/exhibitor-mesos-framework.git
     # cd exhibitor-mesos-framework
     # ./gradlew jar
     
@@ -461,4 +461,4 @@ Usage: remove <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
 ```
 
-[Open issues here](https://github.com/CiscoCloud/exhibitor-mesos-framework/issues).
+[Open issues here](https://github.com/elodina/exhibitor-mesos-framework/issues).

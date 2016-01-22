@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
-import ly.stealth.mesos.exhibitor.Cli.sendRequest
-import ly.stealth.mesos.exhibitor.Util.parseMap
+import Cli.sendRequest
+import net.elodina.mesos.exhibitor.Util.parseMap
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
 

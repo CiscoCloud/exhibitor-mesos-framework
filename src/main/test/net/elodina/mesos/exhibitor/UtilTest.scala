@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.util
 
-import ly.stealth.mesos.exhibitor.Util.Range
+import net.elodina.mesos.exhibitor.Util.Range
 import org.junit.Assert._
 import org.junit.Test
 

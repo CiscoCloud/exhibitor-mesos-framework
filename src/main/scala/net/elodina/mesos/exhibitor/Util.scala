@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.io.{IOException, InputStream, OutputStream}
 import java.text.SimpleDateFormat

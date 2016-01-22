@@ -1,10 +1,10 @@
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.util
 import java.util.concurrent.TimeUnit
 import java.util.{Collections, Date}
 
-import ly.stealth.mesos.exhibitor.Util.Str
+import net.elodina.mesos.exhibitor.Util.Str
 import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}

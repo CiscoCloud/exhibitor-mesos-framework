@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import org.junit.Assert._
 import org.junit.Test

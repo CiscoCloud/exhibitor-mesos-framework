@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.io.{DataOutputStream, File, IOException}
 import java.net.{HttpURLConnection, URL, URLClassLoader}
