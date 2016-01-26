@@ -48,5 +48,5 @@ jar {
             exclude "META-INF/*.RSA"
         }
     }
-    manifest.attributes("Main-Class": "ly.stealth.mesos.exhibitor.Cli")
+    manifest.attributes("Main-Class": "net.elodina.mesos.exhibitor.Cli")
 }

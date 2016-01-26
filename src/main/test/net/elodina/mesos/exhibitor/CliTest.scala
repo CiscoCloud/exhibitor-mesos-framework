@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import java.io.{ByteArrayOutputStream, IOException, PrintStream}
 
-import ly.stealth.mesos.exhibitor.Cli.CliError
+import Cli.CliError
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
 

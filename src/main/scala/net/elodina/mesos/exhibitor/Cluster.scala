@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ly.stealth.mesos.exhibitor
+package net.elodina.mesos.exhibitor
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
