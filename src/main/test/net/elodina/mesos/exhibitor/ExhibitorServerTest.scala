@@ -181,7 +181,7 @@ class ExhibitorServerTest extends MesosTestCase {
     val allServersRunning = Scheduler.acceptOffer(offer)
     assertEquals(allServersRunning, Some("all servers are running"))
 
-    Scheduler.cluster.servers += exhibitor
+    Scheduler.cluster.addServer(exhibitor)
     exhibitor.state = ExhibitorServer.Stopped
     val accepted = Scheduler.acceptOffer(offer)
     assertEquals(None, accepted)

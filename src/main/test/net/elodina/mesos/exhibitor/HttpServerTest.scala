@@ -1,24 +1,24 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements.  See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership.  The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License.  You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 
 package net.elodina.mesos.exhibitor
 
-import Cli.sendRequest
+import net.elodina.mesos.exhibitor.Cli.sendRequest
 import net.elodina.mesos.exhibitor.Util.parseMap
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
@@ -42,7 +42,7 @@ class HttpServerTest extends MesosTestCase {
   @Test
   def addServer() {
     val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128,port=3000..8000")).as[ApiResponse]
-    assertEquals(1, Scheduler.cluster.servers.size)
+    assertEquals(1, Scheduler.cluster.length())
     val server = Scheduler.cluster.servers.head
 
     assertEquals("0", server.id)
@@ -97,7 +97,7 @@ class HttpServerTest extends MesosTestCase {
     sendRequest("/add", parseMap("id=2"))
 
     sendRequest("/remove", parseMap("id=1"))
-    assertEquals(2, Scheduler.cluster.servers.size)
+    assertEquals(2, Scheduler.cluster.length())
   }
 
   @Test
