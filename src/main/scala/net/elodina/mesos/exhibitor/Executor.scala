@@ -93,6 +93,7 @@ object Executor extends org.apache.mesos.Executor {
   }
 
   private def initLogging() {
+    System.setProperty("log4j.ignoreTCL", "true") // fix  log4j class loading issue
     BasicConfigurator.resetConfiguration()
 
     val root = Logger.getRootLogger
