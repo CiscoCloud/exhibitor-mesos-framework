@@ -348,7 +348,7 @@ object Cli {
         config.updated("framework-timeout", value)
       }
 
-      opt[String]("storage").optional().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Defaults to file:exhibitor-mesos.json. Optional.").action { (value, config) =>
+      opt[String]("storage").required().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.").action { (value, config) =>
         config.updated("storage", value)
       }
 

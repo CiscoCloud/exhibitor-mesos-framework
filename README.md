@@ -81,7 +81,7 @@ Usage: scheduler [options]
   --framework-timeout <value>
         Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional
   --storage <value>
-        Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Defaults to file:exhibitor-mesos.json. Optional.
+        Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.
   --ensemble-modify-retries <value>
         Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.
   --ensemble-modify-backoff <value>
