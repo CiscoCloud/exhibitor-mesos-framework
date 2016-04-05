@@ -1,5 +1,5 @@
 #!/bin/sh
-jar='mesos-exhibitor*.jar'
+jar='exhibitor-mesos*.jar'
 
 check_jar() {
     jars=$(find . -maxdepth 1 -name "$jar" | wc -l)

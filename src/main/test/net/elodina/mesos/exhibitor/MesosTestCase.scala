@@ -268,6 +268,12 @@ class MesosTestCase {
     def abort(): Status = throw new UnsupportedOperationException
 
     def start(): Status = throw new UnsupportedOperationException
+
+    override def acceptOffers(offerIds: util.Collection[OfferID], operations: util.Collection[_root_.org.apache.mesos.Protos.Offer.Operation], filters: Filters): Status = throw new UnsupportedOperationException
+
+    override def acknowledgeStatusUpdate(status: TaskStatus): Status = throw new UnsupportedOperationException
+
+    override def suppressOffers(): Status = throw new UnsupportedOperationException
   }
 
   class TestExecutorDriver extends ExecutorDriver {

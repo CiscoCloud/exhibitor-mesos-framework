@@ -1,4 +1,4 @@
-package net.elodina.mesos.exhibitor
+package net.elodina.mesos.exhibitor.exhibitorapi
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -82,19 +82,5 @@ object SharedConfig {
 case class ExhibitorServerStatus(hostname: String, isLeader: Boolean, description: String, code: Int)
 
 object ExhibitorServerStatus {
-  implicit val reader = (
-    (__ \ 'hostname).read[String] and
-      (__ \ 'isLeader).read[Boolean] and
-      (__ \ 'description).read[String] and
-      (__ \ 'code).read[Int]) (ExhibitorServerStatus.apply _)
-
-  implicit val writer = new Writes[ExhibitorServerStatus] {
-    def writes(ess: ExhibitorServerStatus): JsValue = {
-      Json.obj(
-        "hostname" -> ess.hostname,
-        "isLeader" -> ess.isLeader,
-        "description" -> ess.description,
-        "code" -> ess.code)
-    }
-  }
+  implicit val format = Json.format[ExhibitorServerStatus]
 }

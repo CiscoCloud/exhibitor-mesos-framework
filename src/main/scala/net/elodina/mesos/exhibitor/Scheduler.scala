@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import java.util.{Collections, Date}
 
 import net.elodina.mesos.exhibitor.Util.Str
+import net.elodina.mesos.exhibitor.exhibitorapi._
 import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
@@ -389,7 +390,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
                 s"exhibitor API to get cluster state")
               None
           }
-        ExhibitorOnMesosServerStatus(server, clusterViewOpt)
+        ExhibitorMesosStatus(server, clusterViewOpt)
       }
 
     ClusterStatus(mesosServerStatuses)

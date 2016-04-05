@@ -21,6 +21,7 @@ package net.elodina.mesos.exhibitor
 import java.io.{IOException, PrintStream}
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
+import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
 import play.api.libs.json.{JsValue, Json}
 import scopt.OptionParser
 

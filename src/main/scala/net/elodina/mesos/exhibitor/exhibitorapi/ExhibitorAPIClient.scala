@@ -1,4 +1,4 @@
-package net.elodina.mesos.exhibitor
+package net.elodina.mesos.exhibitor.exhibitorapi
 
 import java.io.{DataOutputStream, IOException}
 import java.net.{HttpURLConnection, URL}

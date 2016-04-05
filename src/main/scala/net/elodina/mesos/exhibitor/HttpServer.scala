@@ -48,7 +48,7 @@ object HttpServer {
   private val logger = Logger.getLogger(HttpServer.getClass)
   private var server: JettyServer = null
 
-  val jarMask = "mesos-exhibitor.*\\.jar"
+  val jarMask = "exhibitor-mesos.*\\.jar"
   val exhibitorMask = "exhibitor.*\\.jar"
   val zookeeperMask = "zookeeper.*"
   val jdkMask = "jdk.*"
@@ -93,7 +93,7 @@ object HttpServer {
   private def resolveDeps() {
     for (file <- new File(".").listFiles()) {
       if (file.getName.matches(jarMask)) jar = file
-      if (file.getName.matches(exhibitorMask)) exhibitorDist = file
+      if (file.getName.matches(exhibitorMask) && !file.getName.matches(jarMask)) exhibitorDist = file
       if (file.getName.matches(zookeeperMask) && !file.isDirectory) zookeeperDist = file
       if (file.getName.matches(jdkMask) && !file.isDirectory) jdkDist = file
     }

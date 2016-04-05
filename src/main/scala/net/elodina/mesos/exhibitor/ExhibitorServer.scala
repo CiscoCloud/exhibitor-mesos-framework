@@ -22,6 +22,7 @@ import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
+import net.elodina.mesos.exhibitor.exhibitorapi.{ExhibitorAPIClient, SharedConfig}
 import org.apache.log4j.Logger
 
 trait Server {
@@ -136,7 +137,7 @@ object ExhibitorServer {
   private lazy val loader = initLoader
 
   private def initLoader: ClassLoader = {
-    new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask)) match {
+    new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask) && !file.getName.matches(HttpServer.jarMask)) match {
       case None => throw new IllegalStateException("Exhibitor standalone jar not found")
       case Some(exhibitorDist) => URLClassLoader.newInstance(Array(exhibitorDist.toURI.toURL), getClass.getClassLoader)
     }

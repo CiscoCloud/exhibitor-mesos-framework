@@ -21,6 +21,7 @@ package net.elodina.mesos.exhibitor
 import java.util.UUID
 
 import com.google.protobuf.ByteString
+import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
 import org.apache.mesos.Protos
 import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
@@ -29,35 +30,6 @@ import play.api.libs.json.{JsValue, Json, Writes, _}
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
-
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var ports: List[Util.Range] = Nil)
-
-object TaskConfig {
-  implicit val reader = (
-    (__ \ 'exhibitorConfig).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
-      (__ \ 'sharedConfigOverride).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
-      (__ \ 'id).read[String] and
-      (__ \ 'hostname).read[String] and
-      (__ \ 'sharedConfigChangeBackoff).read[Long] and
-      (__ \ 'cpu).read[Double] and
-      (__ \ 'mem).read[Double] and
-      (__ \ 'ports).read[String].map(Util.Range.parseRanges)) (TaskConfig.apply _)
-
-  implicit val writer = new Writes[TaskConfig] {
-    def writes(tc: TaskConfig): JsValue = {
-      Json.obj(
-        "exhibitorConfig" -> tc.exhibitorConfig.toMap[String, String],
-        "sharedConfigOverride" -> tc.sharedConfigOverride.toMap[String, String],
-        "id" -> tc.id,
-        "hostname" -> tc.hostname,
-        "cpu" -> tc.cpus,
-        "mem" -> tc.mem,
-        "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff,
-        "ports" -> tc.ports.mkString(",")
-      )
-    }
-  }
-}
 
 case class Exhibitor(id: String) {
   private[exhibitor] var task: Exhibitor.Task = null
@@ -238,43 +210,21 @@ object Exhibitor {
   })
 }
 
-
 /**
   * @param server               Exhibitor-on-mesos server instance
   * @param exhibitorClusterView a holder for Exhibitor's /status endpoint response - the view of the Exhibitor cluster
   *                             status from the particular node
   */
-case class ExhibitorOnMesosServerStatus(server: Exhibitor, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]])
+case class ExhibitorMesosStatus(server: Exhibitor, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]])
 
-object ExhibitorOnMesosServerStatus {
-
-  implicit val writer = new Writes[ExhibitorOnMesosServerStatus] {
-    def writes(emss: ExhibitorOnMesosServerStatus): JsValue = {
-      Json.obj(
-        "server" -> emss.server,
-        "exhibitorClusterView" -> emss.exhibitorClusterView
-      )
-    }
-  }
-
-  implicit val reader = (
-    (__ \ 'server).read[Exhibitor] and
-      (__ \ 'exhibitorClusterView).read[Option[Seq[ExhibitorServerStatus]]]) (ExhibitorOnMesosServerStatus.apply _)
+object ExhibitorMesosStatus {
+  implicit val format = Json.format[ExhibitorMesosStatus]
 }
 
-case class ClusterStatus(serverStatuses: Seq[ExhibitorOnMesosServerStatus]) {
+case class ClusterStatus(serverStatuses: Seq[ExhibitorMesosStatus]) {
   val servers = serverStatuses.map(_.server)
 }
 
 object ClusterStatus {
-
-  implicit val writer = new Writes[ClusterStatus] {
-    def writes(cs: ClusterStatus): JsValue = {
-      Json.obj(
-        "serverStatuses" -> cs.serverStatuses
-      )
-    }
-  }
-
-  implicit val reader = (__ \ 'serverStatuses).read[Seq[ExhibitorOnMesosServerStatus]].map { l => ClusterStatus(l) }
+  implicit val format = Json.format[ClusterStatus]
 }
