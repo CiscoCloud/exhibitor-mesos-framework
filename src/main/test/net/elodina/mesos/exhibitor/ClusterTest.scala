@@ -29,7 +29,7 @@ class ClusterTest extends MesosTestCase {
   def expandIds() {
     val cluster = Cluster()
 
-    (0 until 5).foreach(i => cluster.addServer(ExhibitorServer("" + i)))
+    (0 until 5).foreach(i => cluster.addServer(Exhibitor("" + i)))
 
     Try(cluster.expandIds("")) match {
       case Failure(t) if t.isInstanceOf[IllegalArgumentException] =>

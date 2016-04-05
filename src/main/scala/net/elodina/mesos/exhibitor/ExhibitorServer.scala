@@ -1,279 +1,177 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements.  See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership.  The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License.  You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 
 package net.elodina.mesos.exhibitor
 
-import java.util.UUID
+import java.io.File
+import java.net.URLClassLoader
+import java.nio.file.{Files, Paths}
 
-import com.google.protobuf.ByteString
-import org.apache.mesos.Protos
-import org.apache.mesos.Protos._
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsValue, Json, Writes, _}
+import net.elodina.mesos.exhibitor.exhibitorapi.{ExhibitorAPIClient, SharedConfig}
+import org.apache.log4j.Logger
 
-import scala.collection.JavaConversions._
-import scala.collection.mutable
-import scala.concurrent.duration.Duration
+trait Server {
+  def isStarted: Boolean
 
-case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var ports: List[Util.Range] = Nil)
+  def start(config: TaskConfig)
 
-object TaskConfig {
-  implicit val reader = (
-    (__ \ 'exhibitorConfig).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
-      (__ \ 'sharedConfigOverride).read[Map[String, String]].map(m => mutable.Map(m.toSeq: _*)) and
-      (__ \ 'id).read[String] and
-      (__ \ 'hostname).read[String] and
-      (__ \ 'sharedConfigChangeBackoff).read[Long] and
-      (__ \ 'cpu).read[Double] and
-      (__ \ 'mem).read[Double] and
-      (__ \ 'ports).read[String].map(Util.Range.parseRanges))(TaskConfig.apply _)
+  def stop()
 
-  implicit val writer = new Writes[TaskConfig] {
-    def writes(tc: TaskConfig): JsValue = {
-      Json.obj(
-        "exhibitorConfig" -> tc.exhibitorConfig.toMap[String, String],
-        "sharedConfigOverride" -> tc.sharedConfigOverride.toMap[String, String],
-        "id" -> tc.id,
-        "hostname" -> tc.hostname,
-        "cpu" -> tc.cpus,
-        "mem" -> tc.mem,
-        "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff,
-        "ports" -> tc.ports.mkString(",")
-      )
-    }
-  }
+  def await()
 }
 
-case class ExhibitorServer(id: String) {
-  private[exhibitor] var task: ExhibitorServer.Task = null
+class ExhibitorServer extends Server {
+  private final val ZK_DATA_DIR = new File("./zkdata")
+  private final val ZK_LOG_DIR = new File("./zklog")
+  private final val ZK_LOG_INDEX_DIR = new File("./zklogindex")
 
-  val config = TaskConfig(new mutable.HashMap[String, String](), new mutable.HashMap[String, String](), id)
+  private val logger = Logger.getLogger(classOf[ExhibitorServer])
+  @volatile var server: AnyRef = null
 
-  private[exhibitor] val constraints: mutable.Map[String, List[Constraint]] = new mutable.HashMap[String, List[Constraint]]
-  private[exhibitor] var state: ExhibitorServer.State = ExhibitorServer.Added
+  private var config: TaskConfig = null
+  private var sharedConfig: SharedConfig = null
 
-  def createTask(offer: Offer): TaskInfo = {
-    val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
+  def url: String = s"http://${config.hostname}:${config.exhibitorConfig(ConfigNames.PORT)}"
 
-    val name = s"exhibitor-${this.id}"
-    val id = ExhibitorServer.nextTaskId(this.id)
-    this.config.exhibitorConfig.put("port", port.toString)
-    this.config.hostname = offer.getHostname
-    val taskId = TaskID.newBuilder().setValue(id).build
-    TaskInfo.newBuilder().setName(name).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-      .setExecutor(newExecutor(this.id))
-      .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
-      .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
-      .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
-      .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
-      Protos.Value.Ranges.newBuilder().addRange(Protos.Value.Range.newBuilder().setBegin(port).setEnd(port))
-    )).build
+  def isStarted: Boolean = server != null
+
+  def start(config: TaskConfig) {
+    if (isStarted) throw new IllegalStateException("Already started")
+
+    this.config = config
+
+    Thread.currentThread().setContextClassLoader(ExhibitorServer.loader)
+
+    server = ExhibitorServer.newServer(config.exhibitorConfig.toMap)
+
+    logger.info("Starting Exhibitor Server")
+    server.getClass.getMethod("start").invoke(server)
+
+    listenForConfigChanges()
   }
 
-  def matches(offer: Offer, otherAttributes: String => List[String] = _ => Nil): Option[String] = {
-    val offerResources = offer.getResourcesList.toList.map(res => res.getName -> res).toMap
+  def await() {
+    if (server != null)
+      server.getClass.getMethod("join").invoke(server)
+  }
 
-    if (getPort(offer).isEmpty) return Some("no suitable port")
+  def stop() {
+    this.synchronized {
+      if (server != null) {
+        val shutdownSignaledField = server.getClass.getDeclaredField("shutdownSignaled")
+        shutdownSignaledField.setAccessible(true)
+        val shutdownSignaled = shutdownSignaledField.get(server)
+        shutdownSignaled.getClass.getMethod("set", classOf[Boolean]).invoke(shutdownSignaled, true: java.lang.Boolean)
+        server.getClass.getMethod("close").invoke(server)
+      }
 
-    offerResources.get("cpus") match {
-      case Some(cpusResource) => if (cpusResource.getScalar.getValue < config.cpus) return Some(s"cpus ${cpusResource.getScalar.getValue} < ${config.cpus}")
-      case None => return Some("no cpus")
+      server = null
     }
+    //TODO
+    //for ( Closeable closeable : creator.getCloseables() )
+    //{
+    //  CloseableUtils.closeQuietly(closeable);
+    //}
+  }
 
-    offerResources.get("mem") match {
-      case Some(memResource) => if (memResource.getScalar.getValue < config.mem) return Some(s"mem ${memResource.getScalar.getValue} < ${config.mem}")
-      case None => return Some("no mem")
-    }
+  private def listenForConfigChanges() {
+    new Thread {
+      override def run() {
+        while (isStarted) {
+          val newConfig = ExhibitorAPIClient.getSystemState(url)
+          if (newConfig != sharedConfig) {
+            logger.debug("Shared configuration changed, applying changes")
+            sharedConfig = newConfig
 
-    val offerAttributes = offer.getAttributesList.toList.foldLeft(Map("hostname" -> offer.getHostname)) { case (attributes, attribute) =>
-      if (attribute.hasText) attributes.updated(attribute.getName, attribute.getText.getValue)
-      else attributes
-    }
+            applyChanges()
+          }
 
-    for ((name, constraints) <- constraints) {
-      for (constraint <- constraints) {
-        offerAttributes.get(name) match {
-          case Some(attribute) => if (!constraint.matches(attribute, otherAttributes(name))) return Some(s"$name doesn't match $constraint")
-          case None => return Some(s"no $name")
+          Thread.sleep(config.sharedConfigChangeBackoff)
         }
       }
-    }
-
-    None
+    }.start()
   }
 
-  def waitFor(state: ExhibitorServer.State, timeout: Duration): Boolean = {
-    var t = timeout.toMillis
-    while (t > 0 && this.state != state) {
-      val delay = Math.min(100, t)
-      Thread.sleep(delay)
-      t -= delay
-    }
-
-    this.state == state
+  private def applyChanges() {
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperInstallDirectory, findZookeeperDist)
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_DIR)
+    createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_DIR)
+    createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_DIR)
   }
 
-  def isReconciling: Boolean = this.state == ExhibitorServer.Reconciling
-
-  private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
-    val java = "$(find jdk* -maxdepth 0 -type d)" // find non-recursively a directory starting with "jdk"
-    val cmd = s"export PATH=$$MESOS_DIRECTORY/$java/bin:$$PATH && java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} net.elodina.mesos.exhibitor.Executor"
-
-    val commandBuilder = CommandInfo.newBuilder()
-    commandBuilder
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/exhibitor/" + HttpServer.exhibitorDist.getName))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/zookeeper/" + HttpServer.zookeeperDist.getName).setExtract(true))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jdk/" + HttpServer.jdkDist.getName).setExtract(true))
-      .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
-      .setValue(cmd)
-
-    this.config.exhibitorConfig.get("s3credentials").foreach { creds =>
-      commandBuilder
-        .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/s3credentials/" + creds))
+  private def createSymlinkIfNotEmpty(link: String, target: File) {
+    if (link != "") {
+      logger.debug(s"Creating symbolic link $link to ${Paths.get(target.toURI)}")
+      target.mkdirs() //create directories if they do not exist yet
+      new File(link).delete() //remove symlink if already exists
+      Files.createSymbolicLink(Paths.get(link), Paths.get(target.toURI)) //create a new symlink
     }
-
-    this.config.exhibitorConfig.get("defaultconfig").foreach { config =>
-      commandBuilder
-        .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/defaultconfig/" + config))
-    }
-
-    ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder().setValue(id))
-      .setCommand(commandBuilder)
-      .setName(s"exhibitor-$id")
-      .build
   }
 
-  private[exhibitor] def getPort(offer: Offer): Option[Long] = {
-    val ports = Util.getRangeResources(offer, "ports").map(r => Util.Range(r.getBegin.toInt, r.getEnd.toInt))
+  private def findZookeeperDist: File = {
+    for (file <- new File(System.getProperty("user.dir")).listFiles()) {
+      if (file.getName.matches(HttpServer.zookeeperMask) && file.isDirectory) return file
+    }
 
-    if (config.ports == Nil) ports.headOption.map(_.start)
-    else ports.flatMap(range => config.ports.flatMap(range.overlap)).headOption.map(_.start)
+    throw new IllegalStateException("Directory that matches " + HttpServer.zookeeperMask + " not found in in current dir")
   }
-
-  def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
 }
 
 object ExhibitorServer {
+  private val logger = Logger.getLogger(classOf[ExhibitorServer])
+  private lazy val loader = initLoader
 
-  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String])
-
-  object Task {
-    implicit val writer = Json.writes[Task]
-    implicit val reader = Json.reads[Task]
-  }
-
-  def nextTaskId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
-
-  def idFromTaskId(taskId: String): String = {
-    taskId.split("-", 3) match {
-      case Array(_, id, _) => id
-      case _ => throw new IllegalArgumentException(taskId)
+  private def initLoader: ClassLoader = {
+    new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask) && !file.getName.matches(HttpServer.jarMask)) match {
+      case None => throw new IllegalStateException("Exhibitor standalone jar not found")
+      case Some(exhibitorDist) => URLClassLoader.newInstance(Array(exhibitorDist.toURI.toURL), getClass.getClassLoader)
     }
   }
 
-  sealed trait State
+  def newServer(props: Map[String, String]): AnyRef = {
+    val params = props.flatMap { case (key, value) =>
+      Array(s"--$key", value)
+    }.toArray
+    logger.info(s"Exhibitor params: ${params.mkString(" ")}")
 
-  case object Added extends State
+    val exhibitorCreatorClass = loader.loadClass("com.netflix.exhibitor.standalone.ExhibitorCreator")
+    val securityArgumentsClass = loader.loadClass("com.netflix.exhibitor.standalone.SecurityArguments")
+    val exhibitorMainClass = loader.loadClass("com.netflix.exhibitor.application.ExhibitorMain")
+    val backupProviderClass = loader.loadClass("com.netflix.exhibitor.core.backup.BackupProvider")
+    val configProviderClass = loader.loadClass("com.netflix.exhibitor.core.config.ConfigProvider")
+    val builderClass = loader.loadClass("com.netflix.exhibitor.core.ExhibitorArguments$Builder")
+    val securityHandlerClass = loader.loadClass("org.mortbay.jetty.security.SecurityHandler")
 
-  case object Stopped extends State
+    val exhibitorCreator = exhibitorCreatorClass.getConstructor(classOf[Array[String]]).newInstance(params).asInstanceOf[AnyRef]
 
-  case object Staging extends State
+    val securityFile = exhibitorCreatorClass.getMethod("getSecurityFile").invoke(exhibitorCreator)
+    val realmSpec = exhibitorCreatorClass.getMethod("getRealmSpec").invoke(exhibitorCreator)
+    val remoteAuthSpec = exhibitorCreatorClass.getMethod("getRemoteAuthSpec").invoke(exhibitorCreator)
+    val securityArguments = securityArgumentsClass.getConstructor(classOf[String], classOf[String], classOf[String]).newInstance(securityFile, realmSpec, remoteAuthSpec).asInstanceOf[AnyRef]
 
-  case object Running extends State
+    val backupProvider = exhibitorCreatorClass.getMethod("getBackupProvider").invoke(exhibitorCreator)
+    val configProvider = exhibitorCreatorClass.getMethod("getConfigProvider").invoke(exhibitorCreator)
+    val builder = exhibitorCreatorClass.getMethod("getBuilder").invoke(exhibitorCreator)
+    val httpPort = exhibitorCreatorClass.getMethod("getHttpPort").invoke(exhibitorCreator)
+    val securityHandler = exhibitorCreatorClass.getMethod("getSecurityHandler").invoke(exhibitorCreator)
+    val exhibitorMain = exhibitorMainClass.getConstructor(backupProviderClass, configProviderClass, builderClass, Integer.TYPE, securityHandlerClass, securityArgumentsClass)
+      .newInstance(backupProvider, configProvider, builder, httpPort, securityHandler, securityArguments).asInstanceOf[AnyRef]
 
-  case object Reconciling extends State
-
-  implicit val writer = new Writes[ExhibitorServer] {
-    def writes(es: ExhibitorServer): JsValue = {
-      Json.obj(
-        "id" -> es.id,
-        "state" -> es.state.toString,
-        "task" -> Option(es.task),
-        "constraints" -> Util.formatConstraints(es.constraints),
-        "config" -> es.config
-      )
-    }
+    exhibitorMain
   }
-
-  implicit val reader = (
-    (__ \ 'id).read[String] and
-      (__ \ 'state).read[String] and
-      (__ \ 'task).readNullable[Task] and
-      (__ \ 'constraints).read[String].map(Constraint.parse) and
-      (__ \ 'config).read[TaskConfig])((id, state, task, constraints, config) => {
-    val server = ExhibitorServer(id)
-    state match {
-      case "Added" => server.state = Added
-      case "Stopped" => server.state = Stopped
-      case "Staging" => server.state = Staging
-      case "Running" => server.state = Running
-      case "Reconciling" => server.state = Reconciling
-    }
-    server.task = task.orNull
-    constraints.foreach(server.constraints += _)
-    config.exhibitorConfig.foreach(server.config.exhibitorConfig += _)
-    config.sharedConfigOverride.foreach(server.config.sharedConfigOverride += _)
-    server.config.cpus = config.cpus
-    server.config.mem = config.mem
-    server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
-    server.config.hostname = config.hostname
-    server.config.ports = config.ports
-    server
-  })
-}
-
-
-/**
- * @param server Exhibitor-on-mesos server instance
- * @param exhibitorClusterView a holder for Exhibitor's /status endpoint response - the view of the Exhibitor cluster
- * status from the particular node
- */
-case class ExhibitorOnMesosServerStatus(server: ExhibitorServer, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]])
-object ExhibitorOnMesosServerStatus{
-
-  implicit val writer = new Writes[ExhibitorOnMesosServerStatus] {
-    def writes(emss: ExhibitorOnMesosServerStatus): JsValue = {
-      Json.obj(
-        "server" -> emss.server,
-        "exhibitorClusterView" -> emss.exhibitorClusterView
-      )
-    }
-  }
-
-  implicit val reader = (
-    (__ \ 'server).read[ExhibitorServer] and
-      (__ \ 'exhibitorClusterView).read[Option[Seq[ExhibitorServerStatus]]])(ExhibitorOnMesosServerStatus.apply _)
-}
-
-case class ClusterStatus(serverStatuses: Seq[ExhibitorOnMesosServerStatus]){
-  val servers = serverStatuses.map(_.server)
-}
-
-object ClusterStatus{
-
-  implicit val writer = new Writes[ClusterStatus] {
-    def writes(cs: ClusterStatus): JsValue = {
-      Json.obj(
-        "serverStatuses" -> cs.serverStatuses
-      )
-    }
-  }
-
-  implicit val reader = (__ \ 'serverStatuses).read[Seq[ExhibitorOnMesosServerStatus]].map{ l => ClusterStatus(l) }
 }

@@ -81,7 +81,7 @@ class MesosTestCase {
     Scheduler.disconnected(schedulerDriver)
 
     Executor.exhibitor.stop()
-    Executor.exhibitor = new Exhibitor
+    Executor.exhibitor = new ExhibitorServer
     BasicConfigurator.resetConfiguration()
   }
 
@@ -268,6 +268,12 @@ class MesosTestCase {
     def abort(): Status = throw new UnsupportedOperationException
 
     def start(): Status = throw new UnsupportedOperationException
+
+    override def acceptOffers(offerIds: util.Collection[OfferID], operations: util.Collection[_root_.org.apache.mesos.Protos.Offer.Operation], filters: Filters): Status = throw new UnsupportedOperationException
+
+    override def acknowledgeStatusUpdate(status: TaskStatus): Status = throw new UnsupportedOperationException
+
+    override def suppressOffers(): Status = throw new UnsupportedOperationException
   }
 
   class TestExecutorDriver extends ExecutorDriver {
@@ -322,7 +328,7 @@ class MesosTestCase {
 
 }
 
-class TestExhibitor extends IExhibitor {
+class TestExhibitor extends Server {
   var failOnStart: Boolean = false
   private val started: AtomicBoolean = new AtomicBoolean(false)
   var config: TaskConfig = null

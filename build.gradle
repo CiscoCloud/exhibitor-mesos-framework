@@ -1,10 +1,10 @@
 apply plugin: 'scala'
 
-version = '0.1'
+version = '0.0.2.0'
 
 sourceCompatibility = '1.7'
 
-jar.archiveName = "mesos-exhibitor-${version}.jar"
+jar.archiveName = "exhibitor-mesos-${version}.jar"
 
 repositories {
     mavenCentral()
@@ -23,10 +23,10 @@ sourceSets {
 
 dependencies {
     compile "org.scala-lang:scala-library:2.10.3"
-    compile "org.apache.mesos:mesos:0.21.1"
+    compile "org.apache.mesos:mesos:0.25.0"
     compile "com.google.protobuf:protobuf-java:2.5.0"
     compile "log4j:log4j:1.2.16"
-    compile 'com.github.scopt:scopt_2.10:3.3.0'
+    compile 'com.github.scopt:scopt_2.10:3.4.0'
     compile "org.eclipse.jetty:jetty-http:9.0.4.v20130625"
     compile "org.eclipse.jetty:jetty-io:9.0.4.v20130625"
     compile "org.eclipse.jetty:jetty-security:9.0.4.v20130625"
@@ -35,7 +35,7 @@ dependencies {
     compile "org.eclipse.jetty:jetty-util:9.0.4.v20130625"
     compile "javax.servlet:javax.servlet-api:3.0.1"
     compile "com.typesafe.play:play-json_2.10:2.3.9"
-    compile "com.101tec:zkclient:0.5"
+    compile "com.101tec:zkclient:0.6"
     testCompile 'junit:junit:4.12'
 }
 

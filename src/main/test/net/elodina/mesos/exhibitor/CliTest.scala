@@ -63,9 +63,9 @@ class CliTest extends MesosTestCase {
 
   @Test
   def status() {
-    Scheduler.cluster.addServer(ExhibitorServer("0"))
-    Scheduler.cluster.addServer(ExhibitorServer("1"))
-    Scheduler.cluster.addServer(ExhibitorServer("2"))
+    Scheduler.cluster.addServer(Exhibitor("0"))
+    Scheduler.cluster.addServer(Exhibitor("1"))
+    Scheduler.cluster.addServer(Exhibitor("2"))
 
     exec("status")
     assertContains("id: 0")
@@ -103,7 +103,7 @@ class CliTest extends MesosTestCase {
 
   @Test
   def config() {
-    Scheduler.cluster.addServer(ExhibitorServer("0"))
+    Scheduler.cluster.addServer(Exhibitor("0"))
 
     exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55")
     val serverOpt = Scheduler.cluster.getServer("0")
@@ -117,24 +117,24 @@ class CliTest extends MesosTestCase {
 
   @Test
   def startStop() {
-    val server0 = ExhibitorServer("0")
-    server0.task = ExhibitorServer.Task("exhibitor-0-slave0-31000", "", "", Map())
+    val server0 = Exhibitor("0")
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
     Scheduler.cluster.addServer(server0)
 
     exec("start 0 --timeout 0ms")
     assertContains("scheduled")
     assertContains("0")
-    assertEquals(server0.state, ExhibitorServer.Stopped)
+    assertEquals(server0.state, Exhibitor.Stopped)
 
     exec("stop 0")
     assertContains("Stopped servers 0")
-    assertEquals(server0.state, ExhibitorServer.Added)
+    assertEquals(server0.state, Exhibitor.Added)
   }
 
   @Test
   def startStopTimeout() {
-    val server0 = ExhibitorServer("0")
-    server0.task = ExhibitorServer.Task("exhibitor-0-slave0-31000", "", "", Map())
+    val server0 = Exhibitor("0")
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
     Scheduler.cluster.addServer(server0)
 
     Try(exec("start 0 --timeout 1ms")) match {
@@ -142,16 +142,16 @@ class CliTest extends MesosTestCase {
       case other => fail(other.toString)
     }
 
-    assertEquals(server0.state, ExhibitorServer.Stopped)
+    assertEquals(server0.state, Exhibitor.Stopped)
 
     exec("stop 0")
     assertContains("Stopped servers 0")
-    assertEquals(server0.state, ExhibitorServer.Added)
+    assertEquals(server0.state, Exhibitor.Added)
   }
 
   @Test
   def remove() {
-    Scheduler.cluster.addServer(ExhibitorServer("0"))
+    Scheduler.cluster.addServer(Exhibitor("0"))
     exec("remove 0")
 
     assertContains("Removed servers 0")

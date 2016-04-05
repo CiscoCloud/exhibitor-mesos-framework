@@ -55,7 +55,7 @@ class HttpServerTest extends MesosTestCase {
     assert(response.success)
     assertNotEquals(None, response.value)
 
-    ExhibitorServerTest.assertServerEquals(server, response.value.get.servers.head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.servers.head)
   }
 
   @Test
@@ -74,7 +74,7 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(response.success)
     assertTrue(response.message.contains("Updated configuration"))
     assertNotEquals(None, response.value)
-    ExhibitorServerTest.assertServerEquals(server, response.value.get.servers.head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.servers.head)
   }
 
   @Test
@@ -108,12 +108,12 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(startResponse.success)
     assertTrue(startResponse.message.contains("scheduled"))
     assertNotEquals(None, startResponse.value)
-    assertEquals(ExhibitorServer.Stopped, startResponse.value.get.servers.head.state)
+    assertEquals(Exhibitor.Stopped, startResponse.value.get.servers.head.state)
 
     val stopResponse = sendRequest("/stop", parseMap("id=0")).as[ApiResponse]
     assertTrue(stopResponse.success)
     assertTrue(stopResponse.message.contains("Stopped servers"))
     assertNotEquals(None, stopResponse.value)
-    assertEquals(ExhibitorServer.Added, stopResponse.value.get.servers.head.state)
+    assertEquals(Exhibitor.Added, stopResponse.value.get.servers.head.state)
   }
 }
