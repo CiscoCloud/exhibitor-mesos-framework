@@ -1,20 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements.  See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership.  The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License.  You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 
 package net.elodina.mesos.exhibitor
 
@@ -22,7 +22,7 @@ import java.io._
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
 import org.apache.log4j.Logger
-import org.eclipse.jetty.server.{Server, ServerConnector}
+import org.eclipse.jetty.server.{ServerConnector, Server => JettyServer}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import play.api.libs.json._
@@ -39,14 +39,14 @@ object ApiResponse {
 
 case class ClusterStatusResponse(success: Boolean, message: String, value: Option[ClusterStatus])
 
-object ClusterStatusResponse{
+object ClusterStatusResponse {
   implicit val format = Json.format[ClusterStatusResponse]
 }
 
 
 object HttpServer {
   private val logger = Logger.getLogger(HttpServer.getClass)
-  private var server: Server = null
+  private var server: JettyServer = null
 
   val jarMask = "mesos-exhibitor.*\\.jar"
   val exhibitorMask = "exhibitor.*\\.jar"
@@ -65,7 +65,7 @@ object HttpServer {
     val threadPool = new QueuedThreadPool(Runtime.getRuntime.availableProcessors() * 16)
     threadPool.setName("Jetty")
 
-    server = new Server(threadPool)
+    server = new JettyServer(threadPool)
     val connector = new ServerConnector(server)
     connector.setPort(Config.httpServerPort)
     connector.setIdleTimeout(60 * 1000)
@@ -167,7 +167,7 @@ object HttpServer {
       if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
       else {
         val servers = ids.map { id =>
-          val server = ExhibitorServer(id)
+          val server = Exhibitor(id)
           cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
           mem.foreach(mem => server.config.mem = mem.toDouble)
           ports.foreach(ports => server.config.ports = Util.Range.parseRanges(ports))
@@ -192,15 +192,15 @@ object HttpServer {
       else {
         val servers = ids.map { id =>
           val server = Scheduler.cluster.getServer(id).get
-          if (server.state == ExhibitorServer.Added) {
-            server.state = ExhibitorServer.Stopped
+          if (server.state == Exhibitor.Added) {
+            server.state = Exhibitor.Stopped
             logger.info(s"Starting server $id")
           } else logger.warn(s"Server $id already started")
           server
         }
 
         if (timeout.toMillis > 0) {
-          val ok = servers.forall(_.waitFor(ExhibitorServer.Running, timeout))
+          val ok = servers.forall(_.waitFor(Exhibitor.Running, timeout))
           if (ok) response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(servers)))))
           else response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Start servers $idExpr timed out after $timeout", None)))
         } else response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Servers $idExpr scheduled to start", Some(Cluster(servers)))))

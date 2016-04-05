@@ -81,7 +81,7 @@ class MesosTestCase {
     Scheduler.disconnected(schedulerDriver)
 
     Executor.exhibitor.stop()
-    Executor.exhibitor = new Exhibitor
+    Executor.exhibitor = new ExhibitorServer
     BasicConfigurator.resetConfiguration()
   }
 
@@ -322,7 +322,7 @@ class MesosTestCase {
 
 }
 
-class TestExhibitor extends IExhibitor {
+class TestExhibitor extends Server {
   var failOnStart: Boolean = false
   private val started: AtomicBoolean = new AtomicBoolean(false)
   var config: TaskConfig = null

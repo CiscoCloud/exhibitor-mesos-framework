@@ -115,7 +115,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
-    cluster.servers(ExhibitorServer.Stopped) match {
+    cluster.servers(Exhibitor.Stopped) match {
       case Nil => Some("all servers are running")
       case servers =>
         val reason = servers.flatMap { server =>
@@ -131,20 +131,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def launchTask(server: ExhibitorServer, offer: Offer) {
+  private def launchTask(server: Exhibitor, offer: Offer) {
     val task = server.createTask(offer)
     val taskId = task.getTaskId.getValue
     val attributes = offer.getAttributesList.toList.filter(_.hasText).map(attr => attr.getName -> attr.getText.getValue).toMap
 
-    server.task = ExhibitorServer.Task(taskId, task.getSlaveId.getValue, task.getExecutor.getExecutorId.getValue, attributes)
-    server.state = ExhibitorServer.Staging
+    server.task = Exhibitor.Task(taskId, task.getSlaveId.getValue, task.getExecutor.getExecutorId.getValue, attributes)
+    server.state = Exhibitor.Staging
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task), Filters.newBuilder().setRefuseSeconds(1).build)
 
     logger.info(s"Starting server ${server.id}: launching task $taskId for offer ${offer.getId.getValue}")
   }
 
   private def onServerStatus(driver: SchedulerDriver, status: TaskStatus) {
-    val server = cluster.getServer(ExhibitorServer.idFromTaskId(status.getTaskId.getValue))
+    val server = cluster.getServer(Exhibitor.idFromTaskId(status.getTaskId.getValue))
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
@@ -163,12 +163,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
     Scheduler.cluster.save()
   }
 
-  private def onServerStarted(serverOpt: Option[ExhibitorServer], driver: SchedulerDriver, status: TaskStatus) {
+  private def onServerStarted(serverOpt: Option[Exhibitor], driver: SchedulerDriver, status: TaskStatus) {
     serverOpt match {
       case Some(server) =>
         this.synchronized {
-          if (server.state != ExhibitorServer.Running) {
-            server.state = ExhibitorServer.Running
+          if (server.state != Exhibitor.Running) {
+            server.state = Exhibitor.Running
             addToEnsemble(server)
           }
         }
@@ -178,20 +178,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def onServerFailed(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
+  private def onServerFailed(serverOpt: Option[Exhibitor], status: TaskStatus) {
     serverOpt match {
       case Some(server) =>
-        server.state = ExhibitorServer.Stopped
+        server.state = Exhibitor.Stopped
         server.task = null
         server.config.hostname = ""
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }
   }
 
-  private def onServerFinished(serverOpt: Option[ExhibitorServer], status: TaskStatus) {
+  private def onServerFinished(serverOpt: Option[Exhibitor], status: TaskStatus) {
     serverOpt match {
       case Some(server) =>
-        server.state = ExhibitorServer.Added
+        server.state = Exhibitor.Added
         server.task = null
         server.config.hostname = ""
         logger.info(s"Task ${status.getTaskId.getValue} has finished")
@@ -199,17 +199,17 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private[exhibitor] def stopServer(id: String): Option[ExhibitorServer] = {
+  private[exhibitor] def stopServer(id: String): Option[Exhibitor] = {
     cluster.getServer(id).map { server =>
-      if (server.state == ExhibitorServer.Staging || server.state == ExhibitorServer.Running)
+      if (server.state == Exhibitor.Staging || server.state == Exhibitor.Running)
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
-      server.state = ExhibitorServer.Added
+      server.state = Exhibitor.Added
       server
     }
   }
 
-  private[exhibitor] def removeServer(id: String): Option[ExhibitorServer] = {
+  private[exhibitor] def removeServer(id: String): Option[Exhibitor] = {
     cluster.getServer(id).map { server =>
       stopServer(id)
 
@@ -219,7 +219,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def addToEnsemble(server: ExhibitorServer) {
+  private def addToEnsemble(server: Exhibitor) {
     def tryAddToEnsemble(retriesLeft: Int) {
       val sharedConfig = getSharedConfig(server, retriesLeft)
 
@@ -240,7 +240,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         }
       }).sorted.mkString(",")
 
-      Try(ExhibitorAPI.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), server.url)) match {
+      Try(ExhibitorAPIClient.setConfig(updatedSharedConfig.copy(serversSpec = updatedServersSpec), server.url)) match {
         case Success(_) => logger.info(s"Successfully added server ${server.id} to ensemble")
         case Failure(e) =>
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
@@ -262,8 +262,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }.start()
   }
 
-  private def removeFromEnsemble(server: ExhibitorServer) {
-    def tryRemoveFromEnsemble(aliveServer: ExhibitorServer, retriesLeft: Int) {
+  private def removeFromEnsemble(server: Exhibitor) {
+    def tryRemoveFromEnsemble(aliveServer: Exhibitor, retriesLeft: Int) {
       val sharedConfig = getSharedConfig(aliveServer, retriesLeft)
 
       val updatedServersSpec = sharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
@@ -274,7 +274,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         }
       }.sorted.mkString(",")
 
-      Try(ExhibitorAPI.setConfig(sharedConfig.copy(serversSpec = updatedServersSpec), aliveServer.url)) match {
+      Try(ExhibitorAPIClient.setConfig(sharedConfig.copy(serversSpec = updatedServersSpec), aliveServer.url)) match {
         case Success(_) =>
         case Failure(e) =>
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
@@ -289,7 +289,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     new Thread {
       override def run() {
         ensembleLock.synchronized {
-          cluster.findWithState(ExhibitorServer.Running) match {
+          cluster.findWithState(Exhibitor.Running) match {
             case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
             case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
           }
@@ -298,9 +298,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }.start()
   }
 
-  private def getSharedConfig(server: ExhibitorServer, retries: Int): SharedConfig = {
+  private def getSharedConfig(server: Exhibitor, retries: Int): SharedConfig = {
     def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
-      Try(ExhibitorAPI.getSystemState(server.url)) match {
+      Try(ExhibitorAPIClient.getSystemState(server.url)) match {
         case Success(cfg) =>
           if (cfg.zookeeperInstallDirectory == "") {
             if (retriesLeft > 0) {
@@ -324,7 +324,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def otherTasksAttributes(name: String): List[String] = {
-    def value(server: ExhibitorServer, name: String): Option[String] = {
+    def value(server: Exhibitor, name: String): Option[String] = {
       if (name == "hostname") Option(server.config.hostname)
       else server.task.attributes.get(name)
     }
@@ -344,7 +344,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       reconciles += 1
       reconcileTime = now
 
-      cluster.servers().foreach(s => if (s.task == null && s.state == ExhibitorServer.Running) s.state = ExhibitorServer.Stopped)
+      cluster.servers().foreach(s => if (s.task == null && s.state == Exhibitor.Running) s.state = Exhibitor.Stopped)
 
       if (reconciles > RECONCILE_MAX_TRIES) {
         cluster.servers().filter(s => s.isReconciling && s.task != null).foreach { server =>
@@ -354,14 +354,14 @@ object Scheduler extends org.apache.mesos.Scheduler {
       } else {
         val statuses = cluster.runningServers().flatMap { server =>
           if (force || server.isReconciling) {
-            server.state = ExhibitorServer.Reconciling
+            server.state = Exhibitor.Reconciling
             logger.info(s"Reconciling $reconciles/$RECONCILE_MAX_TRIES state of server ${server.id}, task ${server.task.id}")
             Some(TaskStatus.newBuilder()
               .setTaskId(TaskID.newBuilder().setValue(server.task.id))
               .setState(TaskState.TASK_STAGING)
               .build)
           } else None
-        }.toList
+        }
 
         if (force || statuses.nonEmpty) driver.reconcileTasks(if (force) Collections.emptyList() else statuses)
       }
@@ -376,8 +376,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
       cluster.servers().map { server =>
         val clusterViewOpt =
           server.state match {
-            case ExhibitorServer.Running =>
-              Try(ExhibitorAPI.getClusterStatus(server.url)) match {
+            case Exhibitor.Running =>
+              Try(ExhibitorAPIClient.getClusterStatus(server.url)) match {
                 case Success(exhibitorClusterStateView) =>
                   Some(exhibitorClusterStateView)
                 case Failure(e) =>
@@ -408,7 +408,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     val logger = Logger.getLogger(Scheduler.getClass)
     logger.setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
-    Logger.getLogger(ExhibitorAPI.getClass).setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
+    Logger.getLogger(ExhibitorAPIClient.getClass).setLevel(if (Config.debug) Level.DEBUG else Level.INFO)
 
     val layout = new PatternLayout("%d [%t] %-5p %c %x - %m%n")
 

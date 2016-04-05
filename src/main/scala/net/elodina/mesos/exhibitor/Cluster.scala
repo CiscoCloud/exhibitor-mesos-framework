@@ -23,25 +23,25 @@ import play.api.libs.json._
 
 import scala.collection.mutable.ListBuffer
 
-case class Cluster(initialServers: List[ExhibitorServer] = Nil) {
+case class Cluster(initialServers: List[Exhibitor] = Nil) {
   private val storage = Cluster.newStorage(Config.storage)
   private[exhibitor] var frameworkId: Option[String] = None
 
-  private[exhibitor] val exhibitorServers = new ListBuffer[ExhibitorServer]
+  private[exhibitor] val exhibitorServers = new ListBuffer[Exhibitor]
   //add anything that was passed to constructor
   initialServers.foreach(exhibitorServers += _)
 
-  def servers(): List[ExhibitorServer] = this.exhibitorServers.toList
+  def servers(): List[Exhibitor] = this.exhibitorServers.toList
 
-  def servers(state: ExhibitorServer.State): List[ExhibitorServer] = servers().filter(_.state == state)
+  def servers(state: Exhibitor.State): List[Exhibitor] = servers().filter(_.state == state)
 
-  def runningServers(): List[ExhibitorServer] = servers().filter(_.task != null)
+  def runningServers(): List[Exhibitor] = servers().filter(_.task != null)
 
-  def getServer(id: String): Option[ExhibitorServer] = servers().find(_.id == id)
+  def getServer(id: String): Option[Exhibitor] = servers().find(_.id == id)
 
-  def findWithState(state: ExhibitorServer.State): Option[ExhibitorServer] = servers().find(_.state == state)
+  def findWithState(state: Exhibitor.State): Option[Exhibitor] = servers().find(_.state == state)
 
-  def addServer(server: ExhibitorServer): Boolean = {
+  def addServer(server: Exhibitor): Boolean = {
     servers().find(_.id == server.id) match {
       case Some(_) => false
       case None =>
@@ -50,7 +50,7 @@ case class Cluster(initialServers: List[ExhibitorServer] = Nil) {
     }
   }
 
-  def removeServer(server: ExhibitorServer): Boolean = {
+  def removeServer(server: Exhibitor): Boolean = {
     servers().find(_.id == server.id) match {
       case Some(_) =>
         exhibitorServers -= server
@@ -70,7 +70,7 @@ case class Cluster(initialServers: List[ExhibitorServer] = Nil) {
     if (expr == null || expr == "") throw new IllegalArgumentException("ID expression cannot be null or empty")
     else {
       expr.split(",").flatMap { part =>
-        if (part == "*") return servers().map(_.id).toList
+        if (part == "*") return servers().map(_.id)
         else Util.Range(part).values.map(_.toString)
       }.distinct.sorted.toList
     }
@@ -104,7 +104,7 @@ object Cluster {
   }
 
   implicit val reader = ((__ \ 'frameworkid).readNullable[String] and
-    (__ \ 'cluster).read[List[ExhibitorServer]]) ((frameworkId, servers) => {
+    (__ \ 'cluster).read[List[Exhibitor]]) ((frameworkId, servers) => {
     val cluster = Cluster(servers)
     cluster.frameworkId = frameworkId
     cluster

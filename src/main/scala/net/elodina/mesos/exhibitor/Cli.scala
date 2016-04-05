@@ -1,20 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements.  See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership.  The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License.  You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
 
 package net.elodina.mesos.exhibitor
 
@@ -271,7 +271,7 @@ object Cli {
 
   private def printCluster(cluster: Cluster) {
     printLine("cluster:")
-    cluster.servers.foreach(s => printExhibitorServer(s, None, 1))
+    cluster.servers().foreach(s => printExhibitorServer(s, None, 1))
   }
 
   private def printClusterStatus(clusterStatus: ClusterStatus) {
@@ -280,7 +280,7 @@ object Cli {
       printExhibitorServer(ss.server, ss.exhibitorClusterView, 1))
   }
 
-  private def printExhibitorServer(server: ExhibitorServer, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]], indent: Int = 0) {
+  private def printExhibitorServer(server: Exhibitor, exhibitorClusterView: Option[Seq[ExhibitorServerStatus]], indent: Int = 0) {
     printLine("server:", indent)
     printLine(s"id: ${server.id}", indent + 1)
     printLine(s"state: ${server.state}", indent + 1)
@@ -297,9 +297,9 @@ object Cli {
 
   private def printExhibitorClusterStateView(statuses: Seq[ExhibitorServerStatus], indent: Int): Unit = {
     printLine("exhibitor cluster view:", indent)
-    val statusString = statuses.sortBy(_.hostname).map{
+    val statusString = statuses.sortBy(_.hostname).map {
       s =>
-        val lof =  if (s.isLeader) "L" else "F"
+        val lof = if (s.isLeader) "L" else "F"
         s"[${s.hostname}, ${s.description}, ${s.code}, $lof]"
     }.mkString("; ")
 

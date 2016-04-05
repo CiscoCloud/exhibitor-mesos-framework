@@ -24,13 +24,13 @@ import play.api.libs.json.Json
 
 import scala.collection.JavaConversions._
 
-class ExhibitorServerTest extends MesosTestCase {
-  var server: ExhibitorServer = null
+class ExhibitorTest extends MesosTestCase {
+  var server: Exhibitor = null
 
   @Before
   override def before() {
     super.before()
-    server = new ExhibitorServer("0")
+    server = new Exhibitor("0")
     server.config.cpus = 0
     server.config.mem = 0
   }
@@ -106,13 +106,13 @@ class ExhibitorServerTest extends MesosTestCase {
 
   @Test
   def idFromTaskId() {
-    assertEquals("0", ExhibitorServer.idFromTaskId(ExhibitorServer.nextTaskId("0")))
-    assertEquals("100", ExhibitorServer.idFromTaskId(ExhibitorServer.nextTaskId("100")))
+    assertEquals("0", Exhibitor.idFromTaskId(Exhibitor.nextTaskId("0")))
+    assertEquals("100", Exhibitor.idFromTaskId(Exhibitor.nextTaskId("100")))
   }
 
   @Test
   def json() {
-    server.state = ExhibitorServer.Staging
+    server.state = Exhibitor.Staging
     server.constraints.clear()
     server.constraints += "hostname" -> List(Constraint("unique"))
     server.config.cpus = 1.2
@@ -122,13 +122,13 @@ class ExhibitorServerTest extends MesosTestCase {
     server.config.exhibitorConfig += "zkconfigconnect" -> "192.168.3.1:2181"
     server.config.sharedConfigOverride += "zookeeper-install-directory" -> "/tmp/zookeeper"
 
-    val decoded = Json.toJson(server).as[ExhibitorServer]
-    ExhibitorServerTest.assertServerEquals(server, decoded)
+    val decoded = Json.toJson(server).as[Exhibitor]
+    ExhibitorTest.assertServerEquals(server, decoded)
   }
 
   @Test
   def newExecutor() {
-    val exhibitor = ExhibitorServer("1")
+    val exhibitor = Exhibitor("1")
     exhibitor.config.cpus = 1.5
 
     val executor = exhibitor.newExecutor("")
@@ -141,7 +141,7 @@ class ExhibitorServerTest extends MesosTestCase {
 
   @Test
   def newTask() {
-    val exhibitor = ExhibitorServer("1")
+    val exhibitor = Exhibitor("1")
     exhibitor.config.cpus = 1.5
     exhibitor.config.mem = 1024
 
@@ -175,14 +175,14 @@ class ExhibitorServerTest extends MesosTestCase {
 
   @Test
   def acceptOffer() {
-    val exhibitor = ExhibitorServer("1")
+    val exhibitor = Exhibitor("1")
     val offer = this.offer(cpus = exhibitor.config.cpus, mem = exhibitor.config.mem.toLong)
 
     val allServersRunning = Scheduler.acceptOffer(offer)
     assertEquals(allServersRunning, Some("all servers are running"))
 
     Scheduler.cluster.addServer(exhibitor)
-    exhibitor.state = ExhibitorServer.Stopped
+    exhibitor.state = Exhibitor.Stopped
     val accepted = Scheduler.acceptOffer(offer)
     assertEquals(None, accepted)
     assertEquals(1, schedulerDriver.launchedTasks.size())
@@ -192,7 +192,7 @@ class ExhibitorServerTest extends MesosTestCase {
   @Test
   def ports() {
     def port(taskPorts: String, offerPorts: String): Option[Long] = {
-      val exhibitor = ExhibitorServer("0")
+      val exhibitor = Exhibitor("0")
       exhibitor.config.ports = Util.Range.parseRanges(taskPorts)
       val offer = this.offer(ports = offerPorts)
       exhibitor.getPort(offer)
@@ -215,8 +215,8 @@ class ExhibitorServerTest extends MesosTestCase {
   }
 }
 
-object ExhibitorServerTest {
-  def assertServerEquals(expected: ExhibitorServer, actual: ExhibitorServer) {
+object ExhibitorTest {
+  def assertServerEquals(expected: Exhibitor, actual: Exhibitor) {
     assertEquals(expected.state, actual.state)
     assertEquals(expected.constraints, actual.constraints)
     assertEquals(expected.config.cpus, actual.config.cpus, 0.001)
