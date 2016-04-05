@@ -155,13 +155,13 @@ object HttpServer {
     }
 
     private def handleAddServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter("id")
+      val idExpr = request.getParameter(ConfigNames.ID)
       val ids = Scheduler.cluster.expandIds(idExpr)
-      val cpus = Option(request.getParameter("cpu"))
-      val mem = Option(request.getParameter("mem"))
-      val constraints = Option(request.getParameter("constraints"))
-      val backoff = Option(request.getParameter("configchangebackoff"))
-      val ports = Option(request.getParameter("port"))
+      val cpus = Option(request.getParameter(ConfigNames.CPU))
+      val mem = Option(request.getParameter(ConfigNames.MEM))
+      val constraints = Option(request.getParameter(ConfigNames.CONSTRAINTS))
+      val backoff = Option(request.getParameter(ConfigNames.SHARED_CONFIG_CHANGE_BACKOFF))
+      val ports = Option(request.getParameter(ConfigNames.PORT))
 
       val existing = ids.filter(Scheduler.cluster.getServer(_).isDefined)
       if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
@@ -183,9 +183,9 @@ object HttpServer {
     }
 
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter("id")
+      val idExpr = request.getParameter(ConfigNames.ID)
       val ids = Scheduler.cluster.expandIds(idExpr)
-      val timeout = Duration(Option(request.getParameter("timeout")).getOrElse("60s"))
+      val timeout = Duration(Option(request.getParameter(ConfigNames.TIMEOUT)).getOrElse("60s"))
 
       val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
@@ -208,7 +208,7 @@ object HttpServer {
     }
 
     private def handleStopServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter("id")
+      val idExpr = request.getParameter(ConfigNames.ID)
       val ids = Scheduler.cluster.expandIds(idExpr)
 
       val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
@@ -221,7 +221,7 @@ object HttpServer {
     }
 
     private def handleRemoveServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter("id")
+      val idExpr = request.getParameter(ConfigNames.ID)
       val ids = Scheduler.cluster.expandIds(idExpr)
 
       val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
@@ -237,15 +237,22 @@ object HttpServer {
       response.getWriter.println(Json.toJson(ClusterStatusResponse(success = true, "", Some(Scheduler.getClusterStatus))))
     }
 
-    private val exhibitorConfigs = Set("configtype", "configcheckms", "defaultconfig", "headingtext", "hostname", "jquerystyle", "loglines", "nodemodification",
-      "prefspath", "servo", "timeout", "s3credentials", "s3region", "s3config", "s3configprefix", "zkconfigconnect", "zkconfigexhibitorpath", "zkconfigexhibitorport",
-      "zkconfigpollms", "zkconfigretry", "zkconfigzpath", "filesystembackup", "s3backup", "aclid", "aclperms", "aclscheme")
-    private val sharedConfigs = Set("log-index-directory", "zookeeper-install-directory", "zookeeper-data-directory", "zookeeper-log-directory",
-      "backup-extra", "zoo-cfg-extra", "java-environment", "log4j-properties", "client-port", "connect-port", "election-port",
-      "check-ms", "cleanup-period-ms", "cleanup-max-files", "backup-max-store-ms", "backup-period-ms")
+    private val exhibitorConfigs = Set(ConfigNames.SHARED_CONFIG_TYPE, ConfigNames.SHARED_CONFIG_CHECK_MS,
+      ConfigNames.DEFAULT_SHARED_CONFIG, ConfigNames.HEADING_TEXT, ConfigNames.HOSTNAME, ConfigNames.JQUERY_STYLE,
+      ConfigNames.LOGLINES, ConfigNames.NODE_MODIFICATION, ConfigNames.PREFS_PATH, ConfigNames.SERVO,
+      ConfigNames.TIMEOUT, ConfigNames.S3_CREDENTIALS, ConfigNames.S3_REGION, ConfigNames.S3_CONFIG,
+      ConfigNames.S3_CONFIG_PREFIX, ConfigNames.ZK_CONFIG_CONNECT, ConfigNames.ZK_CONFIG_EXHIBITOR_PATH,
+      ConfigNames.ZK_CONFIG_EXHIBITOR_PORT, ConfigNames.ZK_CONFIG_POLL_MS, ConfigNames.ZK_CONFIG_RETRY,
+      ConfigNames.ZK_CONFIG_ZPATH, ConfigNames.FILE_SYSTEM_BACKUP, ConfigNames.S3_BACKUP, ConfigNames.ACL_ID,
+      ConfigNames.ACL_PERMISSIONS, ConfigNames.ACL_SCHEME)
+    private val sharedConfigs = Set(ConfigNames.LOG_INDEX_DIRECTORY, ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY,
+      ConfigNames.ZOOKEEPER_DATA_DIRECTORY, ConfigNames.ZOOKEEPER_LOG_DIRECTORY, ConfigNames.BACKUP_EXTRA,
+      ConfigNames.ZOO_CFG_EXTRA, ConfigNames.JAVA_ENVIRONMENT, ConfigNames.LOG4J_PROPERTIES, ConfigNames.CLIENT_PORT,
+      ConfigNames.CONNECT_PORT, ConfigNames.ELECTION_PORT, ConfigNames.CHECK_MS, ConfigNames.CLEANUP_PERIOD_MS,
+      ConfigNames.CLEANUP_MAX_FILES, ConfigNames.BACKUP_MAX_STORE_MS, ConfigNames.BACKUP_PERIOD_MS)
 
     private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter("id")
+      val idExpr = request.getParameter(ConfigNames.ID)
       val ids = Scheduler.cluster.expandIds(idExpr)
 
       logger.info(s"Received configurations for servers $idExpr: ${request.getParameterMap.toMap.map(entry => entry._1 -> entry._2.head)}")
@@ -258,7 +265,7 @@ object HttpServer {
           request.getParameterMap.toMap.foreach {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
-            case ("port", Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
+            case (ConfigNames.PORT, Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
           server

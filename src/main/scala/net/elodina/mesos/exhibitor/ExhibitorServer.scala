@@ -46,7 +46,7 @@ class ExhibitorServer extends Server {
   private var config: TaskConfig = null
   private var sharedConfig: SharedConfig = null
 
-  def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
+  def url: String = s"http://${config.hostname}:${config.exhibitorConfig(ConfigNames.PORT)}"
 
   def isStarted: Boolean = server != null
 

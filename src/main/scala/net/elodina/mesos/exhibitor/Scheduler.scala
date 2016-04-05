@@ -226,8 +226,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
       val updatedSharedConfig = server.config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
         key match {
-          case "zookeeper-install-directory" => conf.copy(zookeeperInstallDirectory = value)
-          case "zookeeper-data-directory" => conf.copy(zookeeperDataDirectory = value)
+          case ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY => conf.copy(zookeeperInstallDirectory = value)
+          case ConfigNames.ZOOKEEPER_DATA_DIRECTORY => conf.copy(zookeeperDataDirectory = value)
           case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
         }
       }

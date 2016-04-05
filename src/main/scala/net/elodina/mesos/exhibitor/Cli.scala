@@ -86,16 +86,16 @@ object Cli {
   def handleScheduler(args: Array[String]) {
     Parsers.scheduler.parse(args, Map()) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
-        Config.master = config("master")
-        config.get("user").foreach(user => Config.user = user)
-        config.get("framework-name").foreach(name => Config.frameworkName = name)
-        config.get("framework-timeout").foreach(timeout => Config.frameworkTimeout = Duration(timeout))
-        config.get("storage").foreach(storage => Config.storage = storage)
-        config.get("ensemble-modify-retries").foreach(retries => Config.ensembleModifyRetries = retries.toInt)
-        config.get("ensemble-modify-backoff").foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
-        config.get("debug").foreach(debug => Config.debug = debug.toBoolean)
+        Config.master = config(ConfigNames.MASTER)
+        config.get(ConfigNames.USER).foreach(user => Config.user = user)
+        config.get(ConfigNames.FRAMEWORK_NAME).foreach(name => Config.frameworkName = name)
+        config.get(ConfigNames.FRAMEWORK_TIMEOUT).foreach(timeout => Config.frameworkTimeout = Duration(timeout))
+        config.get(ConfigNames.STORAGE).foreach(storage => Config.storage = storage)
+        config.get(ConfigNames.ENSEMBLE_MODIFY_RETRIES).foreach(retries => Config.ensembleModifyRetries = retries.toInt)
+        config.get(ConfigNames.ENSEMBLE_MODIFY_BACKOFF).foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
+        config.get(ConfigNames.DEBUG).foreach(debug => Config.debug = debug.toBoolean)
 
         Scheduler.start()
       case None => throw CliError("Invalid arguments")
@@ -104,9 +104,9 @@ object Cli {
 
   def handleAdd(args: Array[String]) {
     val id = getID(args, () => Parsers.add.showUsage)
-    Parsers.add.parse(args.tail, Map("id" -> id)) match {
+    Parsers.add.parse(args.tail, Map(ConfigNames.ID -> id)) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val response = sendRequest("/add", config).as[ApiResponse]
         printLine(response.message)
@@ -118,9 +118,9 @@ object Cli {
 
   def handleStart(args: Array[String]) {
     val id = getID(args, () => Parsers.start.showUsage)
-    Parsers.start.parse(args.tail, Map("id" -> id)) match {
+    Parsers.start.parse(args.tail, Map(ConfigNames.ID -> id)) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val response = sendRequest("/start", config).as[ApiResponse]
         if (!response.success) throw CliError(response.message)
@@ -134,9 +134,9 @@ object Cli {
 
   def handleStop(args: Array[String]) {
     val id = getID(args, () => Parsers.stop.showUsage)
-    Parsers.stop.parse(args.tail, Map("id" -> id)) match {
+    Parsers.stop.parse(args.tail, Map(ConfigNames.ID -> id)) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val response = sendRequest("/stop", config).as[ApiResponse]
         printLine(response.message)
@@ -147,9 +147,9 @@ object Cli {
 
   def handleRemove(args: Array[String]) {
     val id = getID(args, () => Parsers.remove.showUsage)
-    Parsers.remove.parse(args.tail, Map("id" -> id)) match {
+    Parsers.remove.parse(args.tail, Map(ConfigNames.ID -> id)) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val response = sendRequest("/remove", config).as[ApiResponse]
         printLine(response.message)
@@ -161,7 +161,7 @@ object Cli {
   def handleStatus(args: Array[String]) {
     Parsers.status.parse(args, Map()) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val clusterStatus = sendRequest("/status", config).as[ClusterStatusResponse]
         printClusterStatus(clusterStatus.value.get)
@@ -171,9 +171,9 @@ object Cli {
 
   def handleConfig(args: Array[String]) {
     val id = getID(args, () => Parsers.config.showUsage)
-    Parsers.config.parse(args.tail, Map("id" -> id)) match {
+    Parsers.config.parse(args.tail, Map(ConfigNames.ID -> id)) match {
       case Some(config) =>
-        resolveApi(config.get("api"))
+        resolveApi(config.get(ConfigNames.API))
 
         val response = sendRequest("/config", config).as[ApiResponse]
         printLine(response.message)
@@ -203,12 +203,12 @@ object Cli {
       return
     }
 
-    if (System.getenv("EM_API") != null) {
-      Config.api = System.getenv("EM_API")
+    if (System.getenv(ConfigNames.API_ENV) != null) {
+      Config.api = System.getenv(ConfigNames.API_ENV)
       return
     }
 
-    throw CliError("Undefined API url. Please provide either a CLI --api option or EM_API env.")
+    throw CliError(s"Undefined API url. Please provide either a CLI --api option or ${ConfigNames.API_ENV} env.")
   }
 
   private[exhibitor] def sendRequest(uri: String, params: Map[String, String]): JsValue = {
@@ -285,7 +285,7 @@ object Cli {
     printLine("server:", indent)
     printLine(s"id: ${server.id}", indent + 1)
     printLine(s"state: ${server.state}", indent + 1)
-    if (!server.config.hostname.isEmpty && server.config.exhibitorConfig.get("port").isDefined) {
+    if (!server.config.hostname.isEmpty && server.config.exhibitorConfig.get(ConfigNames.PORT).isDefined) {
       printLine(s"endpoint: ${server.url}/exhibitor/v1/ui/index.html", indent + 1)
     }
     if (server.constraints.nonEmpty)
@@ -328,41 +328,41 @@ object Cli {
 
   private object Parsers {
     val scheduler = new CliOptionParser("scheduler") {
-      opt[String]('m', "master").required().text("Mesos Master addresses. Required.").action { (value, config) =>
-        config.updated("master", value)
+      opt[String]('m', ConfigNames.MASTER).required().text("Mesos Master addresses. Required.").action { (value, config) =>
+        config.updated(ConfigNames.MASTER, value)
       }
 
-      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
-        config.updated("api", value)
+      opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
+        config.updated(ConfigNames.API, value)
       }
 
-      opt[String]('u', "user").optional().text("Mesos user. Defaults to current system user.").action { (value, config) =>
-        config.updated("user", value)
+      opt[String]('u', ConfigNames.USER).optional().text("Mesos user. Defaults to current system user.").action { (value, config) =>
+        config.updated(ConfigNames.USER, value)
       }
 
-      opt[String]("framework-name").optional().text("Mesos framework name. Defaults to exhibitor. Optional").action { (value, config) =>
-        config.updated("framework-name", value)
+      opt[String](ConfigNames.FRAMEWORK_NAME).optional().text("Mesos framework name. Defaults to exhibitor. Optional").action { (value, config) =>
+        config.updated(ConfigNames.FRAMEWORK_NAME, value)
       }
 
-      opt[String]("framework-timeout").optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
+      opt[String](ConfigNames.FRAMEWORK_TIMEOUT).optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
         Duration(value)
-        config.updated("framework-timeout", value)
+        config.updated(ConfigNames.FRAMEWORK_TIMEOUT, value)
       }
 
-      opt[String]("storage").required().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.").action { (value, config) =>
-        config.updated("storage", value)
+      opt[String](ConfigNames.STORAGE).required().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.").action { (value, config) =>
+        config.updated(ConfigNames.STORAGE, value)
       }
 
-      opt[Int]("ensemble-modify-retries").optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
-        config.updated("ensemble-modify-retries", value.toString)
+      opt[Int](ConfigNames.ENSEMBLE_MODIFY_RETRIES).optional().text("Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ENSEMBLE_MODIFY_RETRIES, value.toString)
       }
 
-      opt[Long]("ensemble-modify-backoff").optional().text("Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.").action { (value, config) =>
-        config.updated("ensemble-modify-backoff", value.toString)
+      opt[Long](ConfigNames.ENSEMBLE_MODIFY_BACKOFF).optional().text("Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ENSEMBLE_MODIFY_BACKOFF, value.toString)
       }
 
-      opt[Boolean]('d', "debug").optional().text("Debug mode. Optional. Defaults to false.").action { (value, config) =>
-        config.updated("debug", value.toString)
+      opt[Boolean]('d', ConfigNames.DEBUG).optional().text("Debug mode. Optional. Defaults to false.").action { (value, config) =>
+        config.updated(ConfigNames.DEBUG, value.toString)
       }
     }
 
@@ -373,39 +373,38 @@ object Cli {
         printConstraintExamples()
       }
 
-      opt[String]('c', "cpu").optional().text(s"CPUs for server. Optional.").action { (value, config) =>
-        config.updated("cpu", value)
+      opt[String]('c', ConfigNames.CPU).optional().text(s"CPUs for server. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CPU, value)
       }
 
-      opt[String]('m', "mem").optional().text("Memory for server. Optional.").action { (value, config) =>
-        config.updated("mem", value)
+      opt[String]('m', ConfigNames.MEM).optional().text("Memory for server. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.MEM, value)
       }
 
-      opt[String]("constraints").optional().text("Constraints (hostname=like:master,rack=like:1.*). See below. Defaults to 'hostname=unique'. Optional.").action { (value, config) =>
-        config.updated("constraints", value)
+      opt[String](ConfigNames.CONSTRAINTS).optional().text("Constraints (hostname=like:master,rack=like:1.*). See below. Defaults to 'hostname=unique'. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CONSTRAINTS, value)
       }
 
-      opt[Long]('b', "configchangebackoff").optional().text("Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.").action { (value, config) =>
-        config.updated("configchangebackoff", value.toString)
+      opt[Long]('b', ConfigNames.SHARED_CONFIG_CHANGE_BACKOFF).optional().text("Backoff between checks whether the shared configuration changed in milliseconds. Defaults to 10000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.SHARED_CONFIG_CHANGE_BACKOFF, value.toString)
       }
 
-      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
-        config.updated("api", value)
+      opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
+        config.updated(ConfigNames.API, value)
       }
 
-      opt[String]("port").optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
-        config.updated("port", value)
+      opt[String](ConfigNames.PORT).optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated(ConfigNames.PORT, value)
       }
     }
 
     val start = new CliOptionParser("start <id>") {
-      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
-        config.updated("api", value)
+      opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
+        config.updated(ConfigNames.API, value)
       }
 
-      opt[String]("timeout").optional().text("Time to wait for server to be started. Should be a parsable Scala Duration value. Defaults to 60s. Optional").action { (value, config) =>
-        Duration(value)
-        config.updated("timeout", value)
+      opt[Duration](ConfigNames.TIMEOUT).optional().text("Time to wait for server to be started. Should be a parsable Scala Duration value. Defaults to 60s. Optional").action { (value, config) =>
+        config.updated(ConfigNames.TIMEOUT, value.toString)
       }
     }
 
@@ -416,193 +415,193 @@ object Cli {
     val status = defaultParser("status")
 
     val config = new CliOptionParser("config <id>") {
-      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
-        config.updated("api", value)
+      opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
+        config.updated(ConfigNames.API, value)
       }
 
       // Exhibitor configs
-      opt[String]("configtype").optional().text("Config type to use: s3 or zookeeper. Optional.").action { (value, config) =>
-        config.updated("configtype", value)
+      opt[String](ConfigNames.SHARED_CONFIG_TYPE).optional().text("Config type to use: s3 or zookeeper. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.SHARED_CONFIG_TYPE, value)
       }
 
-      opt[String]("configcheckms").optional().text("Period (ms) to check for shared config updates. Optional.").action { (value, config) =>
-        config.updated("configcheckms", value)
+      opt[String](ConfigNames.SHARED_CONFIG_CHECK_MS).optional().text("Period (ms) to check for shared config updates. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.SHARED_CONFIG_CHECK_MS, value)
       }
 
-      opt[String]("defaultconfig").optional().text("Full path to a file that contains initial/default values for Exhibitor/ZooKeeper config values. The file is a standard property file. Optional.").action { (value, config) =>
-        config.updated("defaultconfig", value)
+      opt[String](ConfigNames.DEFAULT_SHARED_CONFIG).optional().text("Full path to a file that contains initial/default values for Exhibitor/ZooKeeper config values. The file is a standard property file. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.DEFAULT_SHARED_CONFIG, value)
       }
 
-      opt[String]("headingtext").optional().text("Extra text to display in UI header. Optional.").action { (value, config) =>
-        config.updated("headingtext", value)
+      opt[String](ConfigNames.HEADING_TEXT).optional().text("Extra text to display in UI header. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.HEADING_TEXT, value)
       }
 
-      opt[String]("hostname").optional().text("Hostname to use for this JVM. Optional.").action { (value, config) =>
-        config.updated("hostname", value)
+      opt[String](ConfigNames.HOSTNAME).optional().text("Hostname to use for this JVM. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.HOSTNAME, value)
       }
 
-      opt[String]("jquerystyle").optional().text("Styling used for the JQuery-based UI. Optional.").action { (value, config) =>
-        config.updated("jquerystyle", value)
+      opt[String](ConfigNames.JQUERY_STYLE).optional().text("Styling used for the JQuery-based UI. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.JQUERY_STYLE, value)
       }
 
-      opt[String]("loglines").optional().text("Max lines of logging to keep in memory for display. Default is 1000. Optional.").action { (value, config) =>
-        config.updated("loglines", value)
+      opt[String](ConfigNames.LOGLINES).optional().text("Max lines of logging to keep in memory for display. Default is 1000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.LOGLINES, value)
       }
 
-      opt[String]("nodemodification").optional().text("If true, the Explorer UI will allow nodes to be modified (use with caution). Default is true. Optional.").action { (value, config) =>
-        config.updated("nodemodification", value)
+      opt[String](ConfigNames.NODE_MODIFICATION).optional().text("If true, the Explorer UI will allow nodes to be modified (use with caution). Default is true. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.NODE_MODIFICATION, value)
       }
 
-      opt[String]("prefspath").optional().text("Certain values (such as Control Panel values) are stored in a preferences file. By default, Preferences.userRoot() is used. Optional.").action { (value, config) =>
-        config.updated("prefspath", value)
+      opt[String](ConfigNames.PREFS_PATH).optional().text("Certain values (such as Control Panel values) are stored in a preferences file. By default, Preferences.userRoot() is used. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.PREFS_PATH, value)
       }
 
-      opt[String]("servo").optional().text("true/false (default is false). If enabled, ZooKeeper will be queried once a minute for its state via the 'mntr' four letter word (this requires ZooKeeper 3.4.x+). Servo will be used to publish this data via JMX. Optional.").action { (value, config) =>
-        config.updated("servo", value)
+      opt[String](ConfigNames.SERVO).optional().text("true/false (default is false). If enabled, ZooKeeper will be queried once a minute for its state via the 'mntr' four letter word (this requires ZooKeeper 3.4.x+). Servo will be used to publish this data via JMX. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.SERVO, value)
       }
 
-      opt[String]("timeout").optional().text("Connection timeout (ms) for ZK connections. Default is 30000. Optional.").action { (value, config) =>
-        config.updated("timeout", value)
+      opt[String](ConfigNames.TIMEOUT).optional().text("Connection timeout (ms) for ZK connections. Default is 30000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.TIMEOUT, value)
       }
 
       // S3 options
-      opt[String]("s3credentials").optional().text("Credentials to use for s3backup or s3config. Optional.").action { (value, config) =>
-        config.updated("s3credentials", value)
+      opt[String](ConfigNames.S3_CREDENTIALS).optional().text("Credentials to use for s3backup or s3config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.S3_CREDENTIALS, value)
       }
 
-      opt[String]("s3region").optional().text("Region for S3 calls (e.g. \"eu-west-1\"). Optional.").action { (value, config) =>
-        config.updated("s3region", value)
+      opt[String](ConfigNames.S3_REGION).optional().text("Region for S3 calls (e.g. \"eu-west-1\"). Optional.").action { (value, config) =>
+        config.updated(ConfigNames.S3_REGION, value)
       }
 
       // Configuration Options for Type "s3"
-      opt[String]("s3config").optional().text("The bucket name and key to store the config (s3credentials may be provided as well). Argument is [bucket name]:[key]. Optional.").action { (value, config) =>
-        config.updated("s3config", value)
+      opt[String](ConfigNames.S3_CONFIG).optional().text("The bucket name and key to store the config (s3credentials may be provided as well). Argument is [bucket name]:[key]. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.S3_CONFIG, value)
       }
 
-      opt[String]("s3configprefix").optional().text("When using AWS S3 shared config files, the prefix to use for values such as locks. Optional.").action { (value, config) =>
-        config.updated("s3configprefix", value)
+      opt[String](ConfigNames.S3_CONFIG_PREFIX).optional().text("When using AWS S3 shared config files, the prefix to use for values such as locks. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.S3_CONFIG_PREFIX, value)
       }
 
       // Configuration Options for Type "zookeeper"
-      opt[String]("zkconfigconnect").optional().text("The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.").action { (value, config) =>
-        config.updated("zkconfigconnect", value)
+      opt[String](ConfigNames.ZK_CONFIG_CONNECT).optional().text("The initial connection string for ZooKeeper shared config storage. E.g: host1:2181,host2:2181... Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_CONNECT, value)
       }
 
-      opt[String]("zkconfigexhibitorpath").optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the URI path for the REST call. The default is: /. Optional.").action { (value, config) =>
-        config.updated("zkconfigexhibitorpath", value)
+      opt[String](ConfigNames.ZK_CONFIG_EXHIBITOR_PATH).optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the URI path for the REST call. The default is: /. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_EXHIBITOR_PATH, value)
       }
 
-      opt[String]("zkconfigexhibitorport").optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the port that Exhibitor is listening on. IMPORTANT: if this value is not set it implies that Exhibitor is not being used on the ZooKeeper shared config. Optional.").action { (value, config) =>
-        config.updated("zkconfigexhibitorport", value)
+      opt[String](ConfigNames.ZK_CONFIG_EXHIBITOR_PORT).optional().text("Used if the ZooKeeper shared config is also running Exhibitor. This is the port that Exhibitor is listening on. IMPORTANT: if this value is not set it implies that Exhibitor is not being used on the ZooKeeper shared config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_EXHIBITOR_PORT, value)
       }
 
-      opt[String]("zkconfigpollms").optional().text("The period in ms to check for changes in the config ensemble. The default is: 10000. Optional.").action { (value, config) =>
-        config.updated("zkconfigpollms", value)
+      opt[String](ConfigNames.ZK_CONFIG_POLL_MS).optional().text("The period in ms to check for changes in the config ensemble. The default is: 10000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_POLL_MS, value)
       }
 
-      opt[String]("zkconfigretry").optional().text("The retry values to use in the form sleep-ms:retry-qty. The default is: 1000:3. Optional.").action { (value, config) =>
-        config.updated("zkconfigretry", value)
+      opt[String](ConfigNames.ZK_CONFIG_RETRY).optional().text("The retry values to use in the form sleep-ms:retry-qty. The default is: 1000:3. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_RETRY, value)
       }
 
-      opt[String]("zkconfigzpath").optional().text("The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.").action { (value, config) =>
-        config.updated("zkconfigzpath", value)
+      opt[String](ConfigNames.ZK_CONFIG_ZPATH).optional().text("The base ZPath that Exhibitor should use. E.g: /exhibitor/config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZK_CONFIG_ZPATH, value)
       }
 
       // Backup Options
-      opt[String]("filesystembackup").optional().text("If true, enables file system backup of ZooKeeper log files. Optional.").action { (value, config) =>
-        config.updated("filesystembackup", value)
+      opt[String](ConfigNames.FILE_SYSTEM_BACKUP).optional().text("If true, enables file system backup of ZooKeeper log files. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.FILE_SYSTEM_BACKUP, value)
       }
 
-      opt[String]("s3backup").optional().text("If true, enables AWS S3 backup of ZooKeeper log files (s3credentials may be provided as well). Optional.").action { (value, config) =>
-        config.updated("s3backup", value)
+      opt[String](ConfigNames.S3_BACKUP).optional().text("If true, enables AWS S3 backup of ZooKeeper log files (s3credentials may be provided as well). Optional.").action { (value, config) =>
+        config.updated(ConfigNames.S3_BACKUP, value)
       }
 
       // ACL Options
-      opt[String]("aclid").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's ID. Optional.").action { (value, config) =>
-        config.updated("aclid", value)
+      opt[String](ConfigNames.ACL_ID).optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's ID. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ACL_ID, value)
       }
 
-      opt[String]("aclperms").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Permissions - a comma list of possible permissions. If this isn't specified the permission is set to ALL. Values: read, write, create, delete, admin. Optional.").action { (value, config) =>
-        config.updated("aclperms", value)
+      opt[String](ConfigNames.ACL_PERMISSIONS).optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Permissions - a comma list of possible permissions. If this isn't specified the permission is set to ALL. Values: read, write, create, delete, admin. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ACL_PERMISSIONS, value)
       }
 
-      opt[String]("aclscheme").optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Scheme. Optional.").action { (value, config) =>
-        config.updated("aclscheme", value)
+      opt[String](ConfigNames.ACL_SCHEME).optional().text("Enable ACL for Exhibitor's internal ZooKeeper connection. This sets the ACL's Scheme. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ACL_SCHEME, value)
       }
 
       // shared configs
-      opt[String]("log-index-directory").optional().text("The directory where indexed Zookeeper logs should be kept. Optional.").action { (value, config) =>
-        config.updated("log-index-directory", value)
+      opt[String](ConfigNames.LOG_INDEX_DIRECTORY).optional().text("The directory where indexed Zookeeper logs should be kept. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.LOG_INDEX_DIRECTORY, value)
       }
 
-      opt[String]("zookeeper-install-directory").optional().text("The directory where the Zookeeper server is installed. Optional.").action { (value, config) =>
-        config.updated("zookeeper-install-directory", value)
+      opt[String](ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY).optional().text("The directory where the Zookeeper server is installed. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY, value)
       }
 
-      opt[String]("zookeeper-data-directory").optional().text("The directory where Zookeeper snapshot data is stored. Optional.").action { (value, config) =>
-        config.updated("zookeeper-data-directory", value)
+      opt[String](ConfigNames.ZOOKEEPER_DATA_DIRECTORY).optional().text("The directory where Zookeeper snapshot data is stored. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZOOKEEPER_DATA_DIRECTORY, value)
       }
 
-      opt[String]("zookeeper-log-directory").optional().text("The directory where Zookeeper transaction log data is stored. Optional.").action { (value, config) =>
-        config.updated("zookeeper-log-directory", value)
+      opt[String](ConfigNames.ZOOKEEPER_LOG_DIRECTORY).optional().text("The directory where Zookeeper transaction log data is stored. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZOOKEEPER_LOG_DIRECTORY, value)
       }
 
-      opt[String]("backup-extra").optional().text("Backup extra shared config. Optional.").action { (value, config) =>
-        config.updated("backup-extra", value)
+      opt[String](ConfigNames.BACKUP_EXTRA).optional().text("Backup extra shared config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.BACKUP_EXTRA, value)
       }
 
-      opt[String]("zoo-cfg-extra").optional().text("Any additional properties to be added to the zoo.cfg file in form: key1\\\\=value1&key2\\\\=value2. Optional.").action { (value, config) =>
-        config.updated("zoo-cfg-extra", value)
+      opt[String](ConfigNames.ZOO_CFG_EXTRA).optional().text("Any additional properties to be added to the zoo.cfg file in form: key1\\\\=value1&key2\\\\=value2. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ZOO_CFG_EXTRA, value)
       }
 
-      opt[String]("java-environment").optional().text("Script to write as the 'java.env' file which gets executed as a part of Zookeeper start script. Optional.").action { (value, config) =>
-        config.updated("java-environment", value)
+      opt[String](ConfigNames.JAVA_ENVIRONMENT).optional().text("Script to write as the 'java.env' file which gets executed as a part of Zookeeper start script. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.JAVA_ENVIRONMENT, value)
       }
 
-      opt[String]("log4j-properties").optional().text("Contents of the log4j.properties file. Optional.").action { (value, config) =>
-        config.updated("log4j-properties", value)
+      opt[String](ConfigNames.LOG4J_PROPERTIES).optional().text("Contents of the log4j.properties file. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.LOG4J_PROPERTIES, value)
       }
 
-      opt[String]("client-port").optional().text("The port that clients use to connect to Zookeeper. Defaults to 2181. Optional.").action { (value, config) =>
-        config.updated("client-port", value)
+      opt[String](ConfigNames.CLIENT_PORT).optional().text("The port that clients use to connect to Zookeeper. Defaults to 2181. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CLIENT_PORT, value)
       }
 
-      opt[String]("connect-port").optional().text("The port that other Zookeeper instances use to connect to Zookeeper. Defaults to 2888. Optional.").action { (value, config) =>
-        config.updated("connect-port", value)
+      opt[String](ConfigNames.CONNECT_PORT).optional().text("The port that other Zookeeper instances use to connect to Zookeeper. Defaults to 2888. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CONNECT_PORT, value)
       }
 
-      opt[String]("election-port").optional().text("The port that other Zookeeper instances use for election. Defaults to 3888. Optional.").action { (value, config) =>
-        config.updated("election-port", value)
+      opt[String](ConfigNames.ELECTION_PORT).optional().text("The port that other Zookeeper instances use for election. Defaults to 3888. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ELECTION_PORT, value)
       }
 
-      opt[String]("check-ms").optional().text("The number of milliseconds between live-ness checks on Zookeeper server. Defaults to 30000. Optional.").action { (value, config) =>
-        config.updated("check-ms", value)
+      opt[String](ConfigNames.CHECK_MS).optional().text("The number of milliseconds between live-ness checks on Zookeeper server. Defaults to 30000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CHECK_MS, value)
       }
 
-      opt[String]("cleanup-period-ms").optional().text("The number of milliseconds between Zookeeper log file cleanups. Defaults to 43200000. Optional.").action { (value, config) =>
-        config.updated("cleanup-period-ms", value)
+      opt[String](ConfigNames.CLEANUP_PERIOD_MS).optional().text("The number of milliseconds between Zookeeper log file cleanups. Defaults to 43200000. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CLEANUP_PERIOD_MS, value)
       }
 
-      opt[String]("cleanup-max-files").optional().text("The max number of Zookeeper log files to keep when cleaning up. Defaults to 3. Optional.").action { (value, config) =>
-        config.updated("cleanup-max-files", value)
+      opt[String](ConfigNames.CLEANUP_MAX_FILES).optional().text("The max number of Zookeeper log files to keep when cleaning up. Defaults to 3. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.CLEANUP_MAX_FILES, value)
       }
 
-      opt[String]("backup-max-store-ms").optional().text("Backup max store ms shared config. Optional.").action { (value, config) =>
-        config.updated("backup-max-store-ms", value)
+      opt[String](ConfigNames.BACKUP_MAX_STORE_MS).optional().text("Backup max store ms shared config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.BACKUP_MAX_STORE_MS, value)
       }
 
-      opt[String]("backup-period-ms").optional().text("Backup period ms shared config. Optional.").action { (value, config) =>
-        config.updated("backup-period-ms", value)
+      opt[String](ConfigNames.BACKUP_PERIOD_MS).optional().text("Backup period ms shared config. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.BACKUP_PERIOD_MS, value)
       }
 
-      opt[String]("port").optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
-        config.updated("port", value)
+      opt[String](ConfigNames.PORT).optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
+        config.updated(ConfigNames.PORT, value)
       }
     }
 
     private def defaultParser(descr: String): OptionParser[Map[String, String]] = new CliOptionParser(descr) {
-      opt[String]('a', "api").optional().text("Binding host:port for http/artifact server. Optional if EM_API env is set.").action { (value, config) =>
-        config.updated("api", value)
+      opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
+        config.updated(ConfigNames.API, value)
       }
     }
   }

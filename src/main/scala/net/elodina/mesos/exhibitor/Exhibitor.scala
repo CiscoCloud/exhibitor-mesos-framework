@@ -44,7 +44,7 @@ case class Exhibitor(id: String) {
 
     val name = s"exhibitor-${this.id}"
     val id = Exhibitor.nextTaskId(this.id)
-    this.config.exhibitorConfig.put("port", port.toString)
+    this.config.exhibitorConfig.put(ConfigNames.PORT, port.toString)
     this.config.hostname = offer.getHostname
     val taskId = TaskID.newBuilder().setValue(id).build
     TaskInfo.newBuilder().setName(name).setTaskId(taskId).setSlaveId(offer.getSlaveId)
@@ -114,12 +114,12 @@ case class Exhibitor(id: String) {
       .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/jar/" + HttpServer.jar.getName))
       .setValue(cmd)
 
-    this.config.exhibitorConfig.get("s3credentials").foreach { creds =>
+    this.config.exhibitorConfig.get(ConfigNames.S3_CREDENTIALS).foreach { creds =>
       commandBuilder
         .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/s3credentials/" + creds))
     }
 
-    this.config.exhibitorConfig.get("defaultconfig").foreach { config =>
+    this.config.exhibitorConfig.get(ConfigNames.DEFAULT_SHARED_CONFIG).foreach { config =>
       commandBuilder
         .addUris(CommandInfo.URI.newBuilder().setValue(s"${Config.api}/defaultconfig/" + config))
     }
@@ -138,7 +138,7 @@ case class Exhibitor(id: String) {
     else ports.flatMap(range => config.ports.flatMap(range.overlap)).headOption.map(_.start)
   }
 
-  def url: String = s"http://${config.hostname}:${config.exhibitorConfig("port")}"
+  def url: String = s"http://${config.hostname}:${config.exhibitorConfig(ConfigNames.PORT)}"
 }
 
 object Exhibitor {
