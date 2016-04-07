@@ -8,6 +8,7 @@ jar.archiveName = "exhibitor-mesos-${version}.jar"
 
 repositories {
     mavenCentral()
+    flatDir { dirs 'lib' }
 }
 
 libsDirName = '../'
@@ -36,6 +37,7 @@ dependencies {
     compile "javax.servlet:javax.servlet-api:3.0.1"
     compile "com.typesafe.play:play-json_2.10:2.3.9"
     compile "com.101tec:zkclient:0.6"
+    compile name: "util-mesos-0.0.1.0"
     testCompile 'junit:junit:4.12'
 }
 

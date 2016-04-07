@@ -18,6 +18,8 @@
 
 package net.elodina.mesos.exhibitor
 
+import java.util.Date
+
 import org.junit.Assert._
 import org.junit.{Before, Test}
 import play.api.libs.json.Json
@@ -75,16 +77,16 @@ class ExhibitorTest extends MesosTestCase {
     server.constraints.clear()
     server.constraints += "hostname" -> List(Constraint("unique"))
     assertEquals(None, server.matches(offer(hostname = "master")))
-    assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "master"), _ => List("master")))
-    assertEquals(None, server.matches(offer(hostname = "master"), _ => List("slave0")))
+    assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "master"), new Date(), _ => List("master")))
+    assertEquals(None, server.matches(offer(hostname = "master"), new Date(), _ => List("slave0")))
 
     // multiple
     server.constraints.clear()
     server.constraints += "hostname" -> List(Constraint("unique"), Constraint("like:slave.*"))
     assertEquals(None, server.matches(offer(hostname = "slave0")))
-    assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "slave0"), _ => List("slave0")))
+    assertEquals(Some("hostname doesn't match unique"), server.matches(offer(hostname = "slave0"), new Date(), _ => List("slave0")))
     assertEquals(Some("hostname doesn't match like:slave.*"), server.matches(offer(hostname = "master")))
-    assertEquals(None, server.matches(offer(hostname = "slave0"), _ => List("master")))
+    assertEquals(None, server.matches(offer(hostname = "slave0"), new Date(), _ => List("master")))
   }
 
   @Test
@@ -100,8 +102,8 @@ class ExhibitorTest extends MesosTestCase {
     server.constraints.clear()
     server.constraints += "floor" -> List(Constraint("unique"))
     assertEquals(None, server.matches(offer(attributes = "rack=1-1,floor=1")))
-    assertEquals(None, server.matches(offer(attributes = "rack=1-1,floor=1"), _ => List("2")))
-    assertEquals(Some("floor doesn't match unique"), server.matches(offer(attributes = "rack=1-1,floor=1"), _ => List("1")))
+    assertEquals(None, server.matches(offer(attributes = "rack=1-1,floor=1"), new Date(), _ => List("2")))
+    assertEquals(Some("floor doesn't match unique"), server.matches(offer(attributes = "rack=1-1,floor=1"), new Date(), _ => List("1")))
   }
 
   @Test

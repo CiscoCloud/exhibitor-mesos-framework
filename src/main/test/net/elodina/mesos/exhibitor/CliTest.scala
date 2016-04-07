@@ -118,7 +118,7 @@ class CliTest extends MesosTestCase {
   @Test
   def startStop() {
     val server0 = Exhibitor("0")
-    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
     Scheduler.cluster.addServer(server0)
 
     exec("start 0 --timeout 0ms")
@@ -134,7 +134,7 @@ class CliTest extends MesosTestCase {
   @Test
   def startStopTimeout() {
     val server0 = Exhibitor("0")
-    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
     Scheduler.cluster.addServer(server0)
 
     Try(exec("start 0 --timeout 1ms")) match {
