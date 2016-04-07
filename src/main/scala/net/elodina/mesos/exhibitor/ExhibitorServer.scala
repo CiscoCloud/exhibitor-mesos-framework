@@ -127,7 +127,9 @@ class ExhibitorServer extends Server {
     if (link != "") {
       logger.debug(s"Creating symbolic link $link to ${Paths.get(target.toURI)}")
       target.mkdirs() //create directories if they do not exist yet
-      new File(link).delete() //remove symlink if already exists
+      val linkFile = new File(link)
+      linkFile.mkdirs() //create directories if they do not exist yet
+      linkFile.delete() //remove symlink if already exists
       Files.createSymbolicLink(Paths.get(link), Paths.get(target.toURI)) //create a new symlink
     }
   }
