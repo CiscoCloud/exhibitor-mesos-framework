@@ -36,9 +36,9 @@ trait Server {
 }
 
 class ExhibitorServer extends Server {
-  private final val ZK_DATA_DIR = new File("./zkdata")
-  private final val ZK_LOG_DIR = new File("./zklog")
-  private final val ZK_LOG_INDEX_DIR = new File("./zklogindex")
+  private final val ZK_DATA_SANDBOX_DIR = new File("zkdata")
+  private final val ZK_LOG_SANDBOX_DIR = new File("zklog")
+  private final val ZK_LOG_INDEX_SANDBOX_DIR = new File("zklogindex")
 
   private val logger = Logger.getLogger(classOf[ExhibitorServer])
   @volatile var server: AnyRef = null
@@ -109,9 +109,18 @@ class ExhibitorServer extends Server {
 
   private def applyChanges() {
     createSymlinkIfNotEmpty(sharedConfig.zookeeperInstallDirectory, findZookeeperDist)
-    createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_DIR)
-    createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_DIR)
-    createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_DIR)
+
+    if (sharedConfig.zookeeperDataDirectory == ExhibitorServer.ZK_DATA_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_SANDBOX_DIR)
+    else new File(sharedConfig.zookeeperDataDirectory).mkdirs()
+
+    if (sharedConfig.zookeeperLogDirectory == ExhibitorServer.ZK_LOG_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_SANDBOX_DIR)
+    else new File(sharedConfig.zookeeperLogDirectory).mkdirs()
+
+    if (sharedConfig.logIndexDirectory == ExhibitorServer.ZK_LOG_INDEX_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_SANDBOX_DIR)
+    else new File(sharedConfig.logIndexDirectory).mkdirs()
   }
 
   private def createSymlinkIfNotEmpty(link: String, target: File) {
@@ -135,6 +144,10 @@ class ExhibitorServer extends Server {
 object ExhibitorServer {
   private val logger = Logger.getLogger(classOf[ExhibitorServer])
   private lazy val loader = initLoader
+
+  final val ZK_DATA_SANDBOX_DIR = "/tmp/exhibitor-zkdata"
+  final val ZK_LOG_SANDBOX_DIR = "/tmp/exhibitor-zklog"
+  final val ZK_LOG_INDEX_SANDBOX_DIR = "/tmp/exhibitor-zklogindex"
 
   private def initLoader: ClassLoader = {
     new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask) && !file.getName.matches(HttpServer.jarMask)) match {
