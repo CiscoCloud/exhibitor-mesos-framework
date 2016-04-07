@@ -228,6 +228,8 @@ object Scheduler extends org.apache.mesos.Scheduler {
         key match {
           case ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY => conf.copy(zookeeperInstallDirectory = value)
           case ConfigNames.ZOOKEEPER_DATA_DIRECTORY => conf.copy(zookeeperDataDirectory = value)
+          case ConfigNames.ZOOKEEPER_LOG_DIRECTORY => conf.copy(zookeeperLogDirectory = value)
+          case ConfigNames.LOG_INDEX_DIRECTORY => conf.copy(logIndexDirectory = value)
           case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
         }
       }
