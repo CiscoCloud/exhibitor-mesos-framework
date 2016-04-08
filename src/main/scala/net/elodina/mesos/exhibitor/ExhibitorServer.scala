@@ -96,6 +96,7 @@ class ExhibitorServer extends Server {
           val newConfig = ExhibitorAPIClient.getSystemState(url)
           if (newConfig != sharedConfig) {
             logger.debug("Shared configuration changed, applying changes")
+            logger.debug(s"New config: $newConfig")
             sharedConfig = newConfig
 
             applyChanges()

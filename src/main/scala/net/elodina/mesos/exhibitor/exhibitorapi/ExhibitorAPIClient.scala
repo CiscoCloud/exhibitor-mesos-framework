@@ -44,6 +44,7 @@ object ExhibitorAPIClient {
       connection.setUseCaches(false)
       connection.setDoInput(true)
       connection.setDoOutput(true)
+      connection.setReadTimeout(10000)
 
       val out = new DataOutputStream(connection.getOutputStream)
       out.writeBytes(Json.prettyPrint(Json.toJson(config)))

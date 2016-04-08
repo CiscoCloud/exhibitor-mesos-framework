@@ -36,8 +36,8 @@ object Config {
   var frameworkName: String = "exhibitor"
   var frameworkTimeout: Duration = 30 days
 
-  var ensembleModifyRetries: Int = 60
-  var ensembleModifyBackoff: Long = 1000
+  var ensembleModifyRetries: Int = 15
+  var ensembleModifyBackoff: Long = 4000
 
   def httpServerPort: Int = {
     val port = new URI(api).getPort
