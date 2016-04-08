@@ -125,7 +125,7 @@ case class Exhibitor(id: String) {
     }
 
     ExecutorInfo.newBuilder()
-      .setExecutorId(ExecutorID.newBuilder().setValue(id))
+      .setExecutorId(ExecutorID.newBuilder().setValue(Exhibitor.nextExecutorId(id)))
       .setCommand(commandBuilder)
       .setName(s"exhibitor-$id")
       .build
@@ -163,6 +163,8 @@ object Exhibitor {
   }
 
   def nextTaskId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
+
+  def nextExecutorId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
 
   def idFromTaskId(taskId: String): String = {
     taskId.split("-", 3) match {
