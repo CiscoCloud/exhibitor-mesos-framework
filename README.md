@@ -118,6 +118,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    stickiness: period: 10m
     exhibitor config:
     shared config overrides:
     cpu: 0.2
@@ -135,6 +136,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    stickiness: period: 10m
     exhibitor config:
     shared config overrides:
     cpu: 0.2
@@ -154,6 +156,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -178,6 +181,7 @@ cluster:
     id: 0
     state: Running
     constraints: hostname=unique
+    stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -201,6 +205,7 @@ cluster:
     state: Running
     endpoint: http://slave0:31000/exhibitor/v1/ui/index.html
     constraints: hostname=unique
+    stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -254,6 +259,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -340,6 +346,8 @@ Usage: config <id> [options]
 
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
+  --stickiness-period <value>
+        Stickiness period to preserve same node for broker (5m, 10m, 1h).
   --configtype <value>
         Config type to use: s3 or zookeeper. Optional.
   --configcheckms <value>

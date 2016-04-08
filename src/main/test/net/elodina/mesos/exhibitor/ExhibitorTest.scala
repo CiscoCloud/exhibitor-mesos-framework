@@ -215,6 +215,38 @@ class ExhibitorTest extends MesosTestCase {
     // no match
     assertEquals(None, port("4000..4100", "31000..32000"))
   }
+
+  @Test
+  def stickiness_allowsHostname {
+    val stickiness = Stickiness()
+    assertTrue(stickiness.allowsHostname("host0", new Date(0)))
+    assertTrue(stickiness.allowsHostname("host1", new Date(0)))
+
+    stickiness.registerStart("host0")
+    stickiness.registerStop(new Date(0))
+    assertTrue(stickiness.allowsHostname("host0", new Date(0)))
+    assertFalse(stickiness.allowsHostname("host1", new Date(0)))
+    assertTrue(stickiness.allowsHostname("host1", new Date(stickiness.period.ms)))
+  }
+
+  @Test
+  def stickiness_registerStart_registerStop {
+    val stickiness = Stickiness()
+    assertTrue(stickiness.hostname.isEmpty)
+    assertTrue(stickiness.stopTime.isEmpty)
+
+    stickiness.registerStart("host")
+    assertEquals(Some("host"), stickiness.hostname)
+    assertTrue(stickiness.stopTime.isEmpty)
+
+    stickiness.registerStop(new Date(0))
+    assertEquals(Some("host"), stickiness.hostname)
+    assertEquals(Some(new Date(0)), stickiness.stopTime)
+
+    stickiness.registerStart("host1")
+    assertEquals(Some("host1"), stickiness.hostname)
+    assertTrue(stickiness.stopTime.isEmpty)
+  }
 }
 
 object ExhibitorTest {

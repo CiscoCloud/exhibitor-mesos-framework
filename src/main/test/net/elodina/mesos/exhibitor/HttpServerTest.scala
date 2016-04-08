@@ -20,6 +20,7 @@ package net.elodina.mesos.exhibitor
 
 import net.elodina.mesos.exhibitor.Cli.sendRequest
 import net.elodina.mesos.exhibitor.Util.parseMap
+import net.elodina.mesos.util.Period
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
 
@@ -61,7 +62,7 @@ class HttpServerTest extends MesosTestCase {
   @Test
   def configServer() {
     sendRequest("/add", parseMap("id=0"))
-    val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper")).as[ApiResponse]
+    val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper,stickiness-period=5m")).as[ApiResponse]
 
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
@@ -70,6 +71,7 @@ class HttpServerTest extends MesosTestCase {
     assertEquals("0", server.id)
     assertEquals(mutable.Map("zkconfigconnect" -> "192.168.3.1:2181"), server.config.exhibitorConfig)
     assertEquals(mutable.Map("zookeeper-install-directory" -> "/tmp/zookeeper"), server.config.sharedConfigOverride)
+    assertEquals(new Period("5m").ms, server.stickiness.period.ms)
 
     assertTrue(response.success)
     assertTrue(response.message.contains("Updated configuration"))
