@@ -28,6 +28,8 @@ object Config {
 
   var master: String = null
   var user: String = ""
+  var principal: Option[String] = None
+  var secret: Option[String] = None
 
   var api: String = null
 
@@ -51,6 +53,8 @@ object ConfigNames {
   final val API = "api"
   final val MASTER = "master"
   final val USER = "user"
+  final val PRINCIPAL = "principal"
+  final val SECRET = "secret"
   final val FRAMEWORK_NAME = "framework-name"
   final val FRAMEWORK_TIMEOUT = "framework-timeout"
   final val FRAMEWORK_ROLE = "framework-role"
