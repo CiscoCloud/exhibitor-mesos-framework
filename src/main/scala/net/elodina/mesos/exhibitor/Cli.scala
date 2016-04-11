@@ -22,6 +22,7 @@ import java.io.{IOException, PrintStream}
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
 import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
+import net.elodina.mesos.util.Repr
 import play.api.libs.json.{JsValue, Json}
 import scopt.OptionParser
 
@@ -291,6 +292,7 @@ object Cli {
     }
     if (server.constraints.nonEmpty)
       printLine(s"constraints: ${Util.formatConstraints(server.constraints)}", indent + 1)
+    printStickiness(server.stickiness, indent + 1)
     printTaskConfig(server.config, indent + 1)
     exhibitorClusterView.foreach(x => printExhibitorClusterStateView(x, indent + 1))
 
@@ -306,6 +308,14 @@ object Cli {
     }.mkString("; ")
 
     printLine(statusString, indent + 1)
+  }
+
+  private def printStickiness(stickiness: Stickiness, indent: Int) {
+    var stickinessStr = "stickiness:"
+    stickinessStr += " period: " + stickiness.period
+    stickinessStr += stickiness.hostname.map(h => ", hostname:" + h).getOrElse("")
+    stickinessStr += stickiness.stopTime.map(s => ", expires:" + Repr.dateTime(s)).getOrElse("")
+    printLine(stickinessStr, indent)
   }
 
   private def printTaskConfig(config: TaskConfig, indent: Int) {
@@ -421,6 +431,10 @@ object Cli {
     val config = new CliOptionParser("config <id>") {
       opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
         config.updated(ConfigNames.API, value)
+      }
+
+      opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).").action { (value, config) =>
+        config.updated(ConfigNames.STICKINESS_PERIOD, value)
       }
 
       // Exhibitor configs

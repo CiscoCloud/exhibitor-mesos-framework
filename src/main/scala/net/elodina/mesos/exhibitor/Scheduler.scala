@@ -123,7 +123,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       case Nil => Some("all servers are running")
       case servers =>
         val reason = servers.flatMap { server =>
-          server.matches(offer, otherTasksAttributes) match {
+          server.matches(offer, new Date(), otherTasksAttributes) match {
             case Some(declineReason) => Some(s"server ${server.id}: $declineReason")
             case None =>
               launchTask(server, offer)
@@ -140,7 +140,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     val taskId = task.getTaskId.getValue
     val attributes = offer.getAttributesList.toList.filter(_.hasText).map(attr => attr.getName -> attr.getText.getValue).toMap
 
-    server.task = Exhibitor.Task(taskId, task.getSlaveId.getValue, task.getExecutor.getExecutorId.getValue, attributes)
+    server.task = Exhibitor.Task(taskId, task.getSlaveId.getValue, task.getExecutor.getExecutorId.getValue, attributes, offer.getHostname)
     server.state = Exhibitor.Staging
     driver.launchTasks(util.Arrays.asList(offer.getId), util.Arrays.asList(task), Filters.newBuilder().setRefuseSeconds(1).build)
 
@@ -173,6 +173,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         this.synchronized {
           if (server.state != Exhibitor.Running) {
             server.state = Exhibitor.Running
+            server.registerStart(server.task.hostname)
             addToEnsemble(server).onFailure { case t =>
               logger.info(s"Failed to add server ${server.id} to ensemble, force fail")
               if (server.task != null) {
@@ -196,6 +197,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         server.state = Exhibitor.Stopped
         server.task = null
         server.config.hostname = ""
+        server.stickiness.registerStop()
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }
   }
@@ -206,6 +208,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         server.state = Exhibitor.Added
         server.task = null
         server.config.hostname = ""
+        server.stickiness.registerStop()
         logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }

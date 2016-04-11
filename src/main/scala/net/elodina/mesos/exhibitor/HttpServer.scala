@@ -21,6 +21,7 @@ package net.elodina.mesos.exhibitor
 import java.io._
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
+import net.elodina.mesos.util.Period
 import org.apache.log4j.Logger
 import org.eclipse.jetty.server.{ServerConnector, Server => JettyServer}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
@@ -270,6 +271,7 @@ object HttpServer {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
             case (ConfigNames.PORT, Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
+            case (ConfigNames.STICKINESS_PERIOD, Array(stickinessPeriod)) => server.stickiness.period = new Period(stickinessPeriod)
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
           server

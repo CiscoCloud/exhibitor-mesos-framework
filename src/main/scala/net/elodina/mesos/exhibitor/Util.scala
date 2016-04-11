@@ -151,9 +151,9 @@ object Util {
   }
 
   object Str {
-    def dateTime(date: Date): String = {
-      new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX").format(date)
-    }
+    def simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ssX")
+
+    def dateTime(date: Date): String = simpleDateFormat.format(date)
 
     def framework(framework: FrameworkInfo): String = "%s name: %s host: %s failover_timeout: %.2f".format(id(framework.getId.getValue), framework.getName, framework.getHostname, framework.getFailoverTimeout)
 

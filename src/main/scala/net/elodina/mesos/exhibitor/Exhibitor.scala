@@ -18,10 +18,11 @@
 
 package net.elodina.mesos.exhibitor
 
-import java.util.UUID
+import java.util.{Date, UUID}
 
 import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
+import net.elodina.mesos.util.Period
 import org.apache.mesos.Protos
 import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
@@ -38,6 +39,8 @@ case class Exhibitor(id: String) {
 
   private[exhibitor] val constraints: mutable.Map[String, List[Constraint]] = new mutable.HashMap[String, List[Constraint]]
   private[exhibitor] var state: Exhibitor.State = Exhibitor.Added
+
+  private[exhibitor] var stickiness = Stickiness()
 
   def createTask(offer: Offer): TaskInfo = {
     val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
@@ -57,7 +60,7 @@ case class Exhibitor(id: String) {
       )).build
   }
 
-  def matches(offer: Offer, otherAttributes: String => List[String] = _ => Nil): Option[String] = {
+  def matches(offer: Offer, now: Date = new Date(), otherAttributes: String => List[String] = _ => Nil): Option[String] = {
     val offerResources = offer.getResourcesList.toList.map(res => res.getName -> res).toMap
 
     if (getPort(offer).isEmpty) return Some("no suitable port")
@@ -71,6 +74,9 @@ case class Exhibitor(id: String) {
       case Some(memResource) => if (memResource.getScalar.getValue < config.mem) return Some(s"mem ${memResource.getScalar.getValue} < ${config.mem}")
       case None => return Some("no mem")
     }
+
+    if (!stickiness.allowsHostname(offer.getHostname, now))
+      return Some("hostname != stickiness host")
 
     val offerAttributes = offer.getAttributesList.toList.foldLeft(Map("hostname" -> offer.getHostname)) { case (attributes, attribute) =>
       if (attribute.hasText) attributes.updated(attribute.getName, attribute.getText.getValue)
@@ -139,6 +145,10 @@ case class Exhibitor(id: String) {
   }
 
   def url: String = s"http://${config.hostname}:${config.exhibitorConfig(ConfigNames.PORT)}"
+
+  def registerStart(hostname: String): Unit = {
+    stickiness.registerStart(hostname)
+  }
 }
 
 object Exhibitor {
@@ -155,7 +165,7 @@ object Exhibitor {
 
   case object Reconciling extends State
 
-  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String])
+  case class Task(id: String, slaveId: String, executorId: String, attributes: Map[String, String], hostname: String)
 
   object Task {
     implicit val writer = Json.writes[Task]
@@ -180,7 +190,8 @@ object Exhibitor {
         "state" -> es.state.toString,
         "task" -> Option(es.task),
         "constraints" -> Util.formatConstraints(es.constraints),
-        "config" -> es.config
+        "config" -> es.config,
+        "stickiness" -> es.stickiness
       )
     }
   }
@@ -190,7 +201,8 @@ object Exhibitor {
       (__ \ 'state).read[String] and
       (__ \ 'task).readNullable[Task] and
       (__ \ 'constraints).read[String].map(Constraint.parse) and
-      (__ \ 'config).read[TaskConfig]) ((id, state, task, constraints, config) => {
+      (__ \ 'config).read[TaskConfig] and
+      (__ \ 'stickiness).read[Stickiness]) ((id, state, task, constraints, config, stickiness) => {
     val server = Exhibitor(id)
     state match {
       case "Added" => server.state = Added
@@ -208,6 +220,7 @@ object Exhibitor {
     server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
     server.config.hostname = config.hostname
     server.config.ports = config.ports
+    server.stickiness = stickiness
     server
   })
 }

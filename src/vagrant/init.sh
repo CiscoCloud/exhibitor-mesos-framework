@@ -17,7 +17,7 @@
 
 install_mesos() {
     mode=$1 # master | slave
-    apt-get -qy install mesos
+    apt-get -qy install mesos=0.25.0*
 
     echo "zk://master:2181/mesos" > /etc/mesos/zk
 

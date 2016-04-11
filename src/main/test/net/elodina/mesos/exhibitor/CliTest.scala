@@ -21,6 +21,7 @@ package net.elodina.mesos.exhibitor
 import java.io.{ByteArrayOutputStream, IOException, PrintStream}
 
 import net.elodina.mesos.exhibitor.Cli.CliError
+import net.elodina.mesos.util.Period
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
 
@@ -105,7 +106,7 @@ class CliTest extends MesosTestCase {
   def config() {
     Scheduler.cluster.addServer(Exhibitor("0"))
 
-    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55")
+    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55 --stickiness-period 5m")
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
     assertEquals(1, serverOpt.get.config.ports.size)
@@ -113,12 +114,13 @@ class CliTest extends MesosTestCase {
     assertEquals(serverOpt.get.config.ports.head.end, 55)
     assertContains("zkconfigconnect: 192.168.3.1:2181")
     assertContains("zookeeper-install-directory: /tmp/zookeeper")
+    assertEquals(serverOpt.get.stickiness.period.ms, new Period("5m").ms)
   }
 
   @Test
   def startStop() {
     val server0 = Exhibitor("0")
-    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
     Scheduler.cluster.addServer(server0)
 
     exec("start 0 --timeout 0ms")
@@ -134,7 +136,7 @@ class CliTest extends MesosTestCase {
   @Test
   def startStopTimeout() {
     val server0 = Exhibitor("0")
-    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map())
+    server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
     Scheduler.cluster.addServer(server0)
 
     Try(exec("start 0 --timeout 1ms")) match {

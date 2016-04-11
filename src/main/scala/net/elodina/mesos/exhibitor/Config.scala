@@ -66,6 +66,7 @@ object ConfigNames {
   final val PORT = "port"
   final val TIMEOUT = "timeout"
   final val SHARED_CONFIG_CHANGE_BACKOFF = "configchangebackoff"
+  final val STICKINESS_PERIOD = "stickiness-period"
 
   final val SHARED_CONFIG_TYPE = "configtype"
   final val SHARED_CONFIG_CHECK_MS = "configcheckms"
