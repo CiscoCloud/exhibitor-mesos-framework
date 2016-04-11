@@ -429,7 +429,7 @@ object Cli {
         config.updated(ConfigNames.API, value)
       }
 
-      opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for broker (5m, 10m, 1h).").action { (value, config) =>
+      opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).").action { (value, config) =>
         config.updated(ConfigNames.STICKINESS_PERIOD, value)
       }
 

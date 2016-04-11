@@ -347,7 +347,7 @@ Usage: config <id> [options]
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   --stickiness-period <value>
-        Stickiness period to preserve same node for broker (5m, 10m, 1h).
+        Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).
   --configtype <value>
         Config type to use: s3 or zookeeper. Optional.
   --configcheckms <value>
