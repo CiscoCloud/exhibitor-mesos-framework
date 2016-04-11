@@ -65,12 +65,12 @@ class ExecutorTest extends MesosTestCase {
     assertTrue(Executor.exhibitor.isStarted)
     assertEquals(Status.DRIVER_RUNNING, executorDriver.status)
 
-    Executor.stopExecutor()
+    Executor.stopExhibitor()
     assertFalse(Executor.exhibitor.isStarted)
     //TODO
     //    assertEquals(Status.DRIVER_STOPPED, executorDriver.status)
 
-    Executor.stopExecutor() // no error
+    Executor.stopExhibitor() // no error
     //    assertEquals(Status.DRIVER_STOPPED, executorDriver.status)
   }
 

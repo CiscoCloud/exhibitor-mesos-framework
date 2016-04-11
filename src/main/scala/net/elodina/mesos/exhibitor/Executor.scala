@@ -68,7 +68,8 @@ object Executor extends org.apache.mesos.Executor {
             logger.error("", t)
             sendTaskFailed(driver, task, t)
         } finally {
-          stopExecutor()
+          stopExhibitor()
+          driver.stop()
         }
       }
     }.start()
@@ -76,7 +77,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def killTask(driver: ExecutorDriver, id: TaskID) {
     logger.info("[killTask] " + id.getValue)
-    stopExecutor()
+    stopExhibitor()
   }
 
   def frameworkMessage(driver: ExecutorDriver, data: Array[Byte]) {
@@ -87,7 +88,7 @@ object Executor extends org.apache.mesos.Executor {
 
   def shutdown(driver: ExecutorDriver) {
     logger.info("[shutdown]")
-    stopExecutor()
+    stopExhibitor()
   }
 
   def error(driver: ExecutorDriver, message: String) {
@@ -116,10 +117,9 @@ object Executor extends org.apache.mesos.Executor {
       .setMessage("" + stackTrace).build)
   }
 
-  private[exhibitor] def stopExecutor(async: Boolean = false) {
+  private[exhibitor] def stopExhibitor(async: Boolean = false) {
     def triggerStop() {
       if (exhibitor.isStarted) exhibitor.stop()
-      //TODO stop driver here?
     }
 
     if (async) {
