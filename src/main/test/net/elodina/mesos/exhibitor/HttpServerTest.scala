@@ -44,7 +44,7 @@ class HttpServerTest extends MesosTestCase {
   def addServer() {
     val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128,port=3000..8000")).as[ApiResponse]
     assertEquals(1, Scheduler.cluster.length())
-    val server = Scheduler.cluster.servers.head
+    val server = Scheduler.cluster.servers().head
 
     assertEquals("0", server.id)
     assertEquals(0.6, server.config.cpus, 0.001)
@@ -56,7 +56,7 @@ class HttpServerTest extends MesosTestCase {
     assert(response.success)
     assertNotEquals(None, response.value)
 
-    ExhibitorTest.assertServerEquals(server, response.value.get.servers.head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.servers().head)
   }
 
   @Test
@@ -70,13 +70,13 @@ class HttpServerTest extends MesosTestCase {
     val server = serverOpt.get
     assertEquals("0", server.id)
     assertEquals(mutable.Map("zkconfigconnect" -> "192.168.3.1:2181"), server.config.exhibitorConfig)
-    assertEquals(mutable.Map("zookeeper-install-directory" -> "/tmp/zookeeper"), server.config.sharedConfigOverride)
+    assertEquals(server.config.sharedConfigOverride(ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY), "/tmp/zookeeper")
     assertEquals(new Period("5m").ms, server.stickiness.period.ms)
 
     assertTrue(response.success)
     assertTrue(response.message.contains("Updated configuration"))
     assertNotEquals(None, response.value)
-    ExhibitorTest.assertServerEquals(server, response.value.get.servers.head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.servers().head)
   }
 
   @Test
@@ -110,12 +110,12 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(startResponse.success)
     assertTrue(startResponse.message.contains("scheduled"))
     assertNotEquals(None, startResponse.value)
-    assertEquals(Exhibitor.Stopped, startResponse.value.get.servers.head.state)
+    assertEquals(Exhibitor.Stopped, startResponse.value.get.servers().head.state)
 
     val stopResponse = sendRequest("/stop", parseMap("id=0")).as[ApiResponse]
     assertTrue(stopResponse.success)
     assertTrue(stopResponse.message.contains("Stopped servers"))
     assertNotEquals(None, stopResponse.value)
-    assertEquals(Exhibitor.Added, stopResponse.value.get.servers.head.state)
+    assertEquals(Exhibitor.Added, stopResponse.value.get.servers().head.state)
   }
 }

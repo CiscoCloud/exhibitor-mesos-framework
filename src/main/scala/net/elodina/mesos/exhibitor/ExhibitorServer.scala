@@ -36,9 +36,9 @@ trait Server {
 }
 
 class ExhibitorServer extends Server {
-  private final val ZK_DATA_DIR = new File("./zkdata")
-  private final val ZK_LOG_DIR = new File("./zklog")
-  private final val ZK_LOG_INDEX_DIR = new File("./zklogindex")
+  private final val ZK_DATA_SANDBOX_DIR = new File("zkdata")
+  private final val ZK_LOG_SANDBOX_DIR = new File("zklog")
+  private final val ZK_LOG_INDEX_SANDBOX_DIR = new File("zklogindex")
 
   private val logger = Logger.getLogger(classOf[ExhibitorServer])
   @volatile var server: AnyRef = null
@@ -96,6 +96,7 @@ class ExhibitorServer extends Server {
           val newConfig = ExhibitorAPIClient.getSystemState(url)
           if (newConfig != sharedConfig) {
             logger.debug("Shared configuration changed, applying changes")
+            logger.debug(s"New config: $newConfig")
             sharedConfig = newConfig
 
             applyChanges()
@@ -109,16 +110,27 @@ class ExhibitorServer extends Server {
 
   private def applyChanges() {
     createSymlinkIfNotEmpty(sharedConfig.zookeeperInstallDirectory, findZookeeperDist)
-    createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_DIR)
-    createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_DIR)
-    createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_DIR)
+
+    if (sharedConfig.zookeeperDataDirectory == ExhibitorServer.ZK_DATA_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.zookeeperDataDirectory, ZK_DATA_SANDBOX_DIR)
+    else new File(sharedConfig.zookeeperDataDirectory).mkdirs()
+
+    if (sharedConfig.zookeeperLogDirectory == ExhibitorServer.ZK_LOG_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.zookeeperLogDirectory, ZK_LOG_SANDBOX_DIR)
+    else new File(sharedConfig.zookeeperLogDirectory).mkdirs()
+
+    if (sharedConfig.logIndexDirectory == ExhibitorServer.ZK_LOG_INDEX_SANDBOX_DIR)
+      createSymlinkIfNotEmpty(sharedConfig.logIndexDirectory, ZK_LOG_INDEX_SANDBOX_DIR)
+    else new File(sharedConfig.logIndexDirectory).mkdirs()
   }
 
   private def createSymlinkIfNotEmpty(link: String, target: File) {
     if (link != "") {
       logger.debug(s"Creating symbolic link $link to ${Paths.get(target.toURI)}")
       target.mkdirs() //create directories if they do not exist yet
-      new File(link).delete() //remove symlink if already exists
+      val linkFile = new File(link)
+      linkFile.mkdirs() //create directories if they do not exist yet
+      linkFile.delete() //remove symlink if already exists
       Files.createSymbolicLink(Paths.get(link), Paths.get(target.toURI)) //create a new symlink
     }
   }
@@ -135,6 +147,10 @@ class ExhibitorServer extends Server {
 object ExhibitorServer {
   private val logger = Logger.getLogger(classOf[ExhibitorServer])
   private lazy val loader = initLoader
+
+  final val ZK_DATA_SANDBOX_DIR = "/tmp/exhibitor-zkdata"
+  final val ZK_LOG_SANDBOX_DIR = "/tmp/exhibitor-zklog"
+  final val ZK_LOG_INDEX_SANDBOX_DIR = "/tmp/exhibitor-zklogindex"
 
   private def initLoader: ClassLoader = {
     new File(".").listFiles().find(file => file.getName.matches(HttpServer.exhibitorMask) && !file.getName.matches(HttpServer.jarMask)) match {

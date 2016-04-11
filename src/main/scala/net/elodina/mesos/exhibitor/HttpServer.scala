@@ -174,6 +174,10 @@ object HttpServer {
           ports.foreach(ports => server.config.ports = Util.Range.parseRanges(ports))
           server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
           backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
+
+          server.config.sharedConfigOverride += ConfigNames.ZOOKEEPER_DATA_DIRECTORY -> ExhibitorServer.ZK_DATA_SANDBOX_DIR
+          server.config.sharedConfigOverride += ConfigNames.ZOOKEEPER_LOG_DIRECTORY -> ExhibitorServer.ZK_LOG_SANDBOX_DIR
+          server.config.sharedConfigOverride += ConfigNames.LOG_INDEX_DIRECTORY -> ExhibitorServer.ZK_LOG_INDEX_SANDBOX_DIR
           Scheduler.cluster.addServer(server)
           server
         }

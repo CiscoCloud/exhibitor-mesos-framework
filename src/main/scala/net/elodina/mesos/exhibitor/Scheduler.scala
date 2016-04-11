@@ -11,6 +11,8 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, SchedulerDriver}
 
 import scala.collection.JavaConversions._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
@@ -34,6 +36,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.frameworkId.foreach(id => frameworkBuilder.setId(FrameworkID.newBuilder().setValue(id)))
     frameworkBuilder.setName(Config.frameworkName)
     frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.toUnit(TimeUnit.SECONDS))
+    frameworkBuilder.setRole(Config.frameworkRole)
     frameworkBuilder.setCheckpoint(true)
 
     val driver = new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master)
@@ -171,7 +174,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
           if (server.state != Exhibitor.Running) {
             server.state = Exhibitor.Running
             server.registerStart(server.task.hostname)
-            addToEnsemble(server)
+            addToEnsemble(server).onFailure { case t =>
+              logger.info(s"Failed to add server ${server.id} to ensemble, force fail")
+              if (server.task != null) {
+                driver.sendFrameworkMessage(
+                  ExecutorID.newBuilder().setValue(server.task.executorId).build(),
+                  SlaveID.newBuilder().setValue(server.task.slaveId).build(),
+                  "fail".getBytes)
+              }
+            }
           }
         }
       case None =>
@@ -218,19 +229,43 @@ object Scheduler extends org.apache.mesos.Scheduler {
       stopServer(id)
 
       cluster.removeServer(server)
-      removeFromEnsemble(server)
+      removeFromEnsemble(server).onFailure { case t =>
+        logger.info(s"Failed to remove server ${server.id} from ensemble")
+      }
       server
     }
   }
 
-  private def addToEnsemble(server: Exhibitor) {
+  private def addToEnsemble(server: Exhibitor): Future[Unit] = {
     def tryAddToEnsemble(retriesLeft: Int) {
-      val sharedConfig = getSharedConfig(server, retriesLeft)
+      getSharedConfig(server) match {
+        case (Some(sharedConfig), None) =>
+          trySaveSharedConfig(sharedConfig, retriesLeft)
+        case (Some(sharedConfig), Some(failureMessage)) =>
+          if (retriesLeft > 0) {
+            logger.debug(s"$failureMessage: retrying...")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryAddToEnsemble(retriesLeft - 1)
+          } else {
+            logger.info(s"Failed to get non-default Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries. Using default.")
+            trySaveSharedConfig(sharedConfig, retriesLeft)
+          }
+        case (None, Some(failureMessage)) =>
+          if (retriesLeft > 0) {
+            logger.debug(s"$failureMessage: retrying...")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryAddToEnsemble(retriesLeft - 1)
+          } else throw new IllegalStateException(failureMessage)
+      }
+    }
 
+    def trySaveSharedConfig(sharedConfig: SharedConfig, retriesLeft: Int) {
       val updatedSharedConfig = server.config.sharedConfigOverride.foldLeft(sharedConfig) { case (conf, (key, value)) =>
         key match {
           case ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY => conf.copy(zookeeperInstallDirectory = value)
           case ConfigNames.ZOOKEEPER_DATA_DIRECTORY => conf.copy(zookeeperDataDirectory = value)
+          case ConfigNames.ZOOKEEPER_LOG_DIRECTORY => conf.copy(zookeeperLogDirectory = value)
+          case ConfigNames.LOG_INDEX_DIRECTORY => conf.copy(logIndexDirectory = value)
           case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
         }
       }
@@ -251,25 +286,43 @@ object Scheduler extends org.apache.mesos.Scheduler {
           if (retriesLeft > 0) {
             logger.debug("Retrying...")
             Thread.sleep(Config.ensembleModifyBackoff)
-            tryAddToEnsemble(retriesLeft - 1)
-          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries")
+            trySaveSharedConfig(sharedConfig, retriesLeft - 1)
+          } else throw e
       }
     }
 
-    new Thread {
-      override def run() {
-        ensembleLock.synchronized {
-          logger.info(s"Adding server ${server.id} to ensemble")
-          tryAddToEnsemble(Config.ensembleModifyRetries)
-        }
+    Future {
+      ensembleLock.synchronized {
+        logger.info(s"Adding server ${server.id} to ensemble")
+        tryAddToEnsemble(Config.ensembleModifyRetries)
       }
-    }.start()
+    }
   }
 
-  private def removeFromEnsemble(server: Exhibitor) {
+  private def removeFromEnsemble(server: Exhibitor): Future[Unit] = {
     def tryRemoveFromEnsemble(aliveServer: Exhibitor, retriesLeft: Int) {
-      val sharedConfig = getSharedConfig(aliveServer, retriesLeft)
+      getSharedConfig(server) match {
+        case (Some(sharedConfig), None) =>
+          trySaveSharedConfig(sharedConfig, aliveServer, retriesLeft)
+        case (Some(sharedConfig), Some(failureMessage)) =>
+          if (retriesLeft > 0) {
+            logger.debug(s"$failureMessage: retrying...")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryRemoveFromEnsemble(aliveServer, retriesLeft - 1)
+          } else {
+            logger.info(s"Failed to get non-default Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries. Using default.")
+            trySaveSharedConfig(sharedConfig, aliveServer, retriesLeft)
+          }
+        case (None, Some(failureMessage)) =>
+          if (retriesLeft > 0) {
+            logger.debug(s"$failureMessage: retrying...")
+            Thread.sleep(Config.ensembleModifyBackoff)
+            tryRemoveFromEnsemble(aliveServer, retriesLeft - 1)
+          } else throw new IllegalStateException(failureMessage)
+      }
+    }
 
+    def trySaveSharedConfig(sharedConfig: SharedConfig, aliveServer: Exhibitor, retriesLeft: Int) {
       val updatedServersSpec = sharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
         srv.split(":") match {
           case Array(_, _, serverHost) if serverHost == server.config.hostname => servers
@@ -279,52 +332,35 @@ object Scheduler extends org.apache.mesos.Scheduler {
       }.sorted.mkString(",")
 
       Try(ExhibitorAPIClient.setConfig(sharedConfig.copy(serversSpec = updatedServersSpec), aliveServer.url)) match {
-        case Success(_) =>
+        case Success(_) => logger.info(s"Successfully removed server ${server.id} from ensemble")
         case Failure(e) =>
           logger.debug(s"Failed to save Exhibitor Shared Configuration: ${e.getMessage}")
           if (retriesLeft > 0) {
             logger.debug("Retrying...")
             Thread.sleep(Config.ensembleModifyBackoff)
-            tryRemoveFromEnsemble(aliveServer, retriesLeft - 1)
-          } else throw new IllegalStateException(s"Failed to save Exhibitor Shared Configuration after ${Config.ensembleModifyRetries} retries")
+            trySaveSharedConfig(sharedConfig, aliveServer, retriesLeft - 1)
+          } else throw e
       }
     }
 
-    new Thread {
-      override def run() {
-        ensembleLock.synchronized {
-          cluster.findWithState(Exhibitor.Running) match {
-            case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
-            case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
-          }
+    Future {
+      ensembleLock.synchronized {
+        cluster.findWithState(Exhibitor.Running) match {
+          case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
+          case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
         }
       }
-    }.start()
+    }
   }
 
-  private def getSharedConfig(server: Exhibitor, retries: Int): SharedConfig = {
-    def tryGetConfig(retriesLeft: Int, backoffMs: Long): SharedConfig = {
-      Try(ExhibitorAPIClient.getSystemState(server.url)) match {
-        case Success(cfg) =>
-          if (cfg.zookeeperInstallDirectory == "") {
-            if (retriesLeft > 0) {
-              Thread.sleep(backoffMs)
-              tryGetConfig(retriesLeft - 1, backoffMs)
-            } else {
-              logger.info(s"Failed to get non-default Exhibitor Shared Configuration after $retries retries. Using default.")
-              cfg
-            }
-          } else cfg
-        case Failure(e) =>
-          logger.info("Exhibitor API not available.")
-          if (retriesLeft > 0) {
-            Thread.sleep(backoffMs)
-            tryGetConfig(retriesLeft - 1, backoffMs)
-          } else throw new IllegalStateException(s"Failed to get Exhibitor Shared Configuration after $retries retries")
-      }
+  private def getSharedConfig(server: Exhibitor): (Option[SharedConfig], Option[String]) = {
+    Try(ExhibitorAPIClient.getSystemState(server.url)) match {
+      case Success(cfg) =>
+        if (cfg.zookeeperInstallDirectory != "") Some(cfg) -> None
+        else Some(cfg) -> Some("Failed to get non-default Exhibitor Shared Configuration")
+      case Failure(e) =>
+        None -> Some("Exhibitor API not available.")
     }
-
-    tryGetConfig(retries, 1000)
   }
 
   private[exhibitor] def otherTasksAttributes(name: String): List[String] = {

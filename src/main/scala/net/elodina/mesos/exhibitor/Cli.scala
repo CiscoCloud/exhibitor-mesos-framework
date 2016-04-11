@@ -93,6 +93,7 @@ object Cli {
         config.get(ConfigNames.USER).foreach(user => Config.user = user)
         config.get(ConfigNames.FRAMEWORK_NAME).foreach(name => Config.frameworkName = name)
         config.get(ConfigNames.FRAMEWORK_TIMEOUT).foreach(timeout => Config.frameworkTimeout = Duration(timeout))
+        config.get(ConfigNames.FRAMEWORK_ROLE).foreach(role => Config.frameworkRole = role)
         config.get(ConfigNames.STORAGE).foreach(storage => Config.storage = storage)
         config.get(ConfigNames.ENSEMBLE_MODIFY_RETRIES).foreach(retries => Config.ensembleModifyRetries = retries.toInt)
         config.get(ConfigNames.ENSEMBLE_MODIFY_BACKOFF).foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
@@ -354,9 +355,12 @@ object Cli {
         config.updated(ConfigNames.FRAMEWORK_NAME, value)
       }
 
-      opt[String](ConfigNames.FRAMEWORK_TIMEOUT).optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
-        Duration(value)
-        config.updated(ConfigNames.FRAMEWORK_TIMEOUT, value)
+      opt[Duration](ConfigNames.FRAMEWORK_TIMEOUT).optional().text("Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional").action { (value, config) =>
+        config.updated(ConfigNames.FRAMEWORK_TIMEOUT, value.toString)
+      }
+
+      opt[String](ConfigNames.FRAMEWORK_ROLE).optional().text("Mesos framework role. Defaults to '*'. Optional").action { (value, config) =>
+        config.updated(ConfigNames.FRAMEWORK_ROLE, value)
       }
 
       opt[String](ConfigNames.STORAGE).required().text("Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.").action { (value, config) =>
