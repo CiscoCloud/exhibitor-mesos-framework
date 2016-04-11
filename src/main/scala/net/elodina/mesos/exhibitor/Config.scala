@@ -35,6 +35,7 @@ object Config {
 
   var frameworkName: String = "exhibitor"
   var frameworkTimeout: Duration = 30 days
+  var frameworkRole: String = "*"
 
   var ensembleModifyRetries: Int = 15
   var ensembleModifyBackoff: Long = 4000
@@ -52,6 +53,7 @@ object ConfigNames {
   final val USER = "user"
   final val FRAMEWORK_NAME = "framework-name"
   final val FRAMEWORK_TIMEOUT = "framework-timeout"
+  final val FRAMEWORK_ROLE = "framework-role"
   final val STORAGE = "storage"
   final val DEBUG = "debug"
   final val ENSEMBLE_MODIFY_RETRIES = "ensemble-modify-retries"

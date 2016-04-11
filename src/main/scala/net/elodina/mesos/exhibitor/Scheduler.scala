@@ -36,6 +36,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     cluster.frameworkId.foreach(id => frameworkBuilder.setId(FrameworkID.newBuilder().setValue(id)))
     frameworkBuilder.setName(Config.frameworkName)
     frameworkBuilder.setFailoverTimeout(Config.frameworkTimeout.toUnit(TimeUnit.SECONDS))
+    frameworkBuilder.setRole(Config.frameworkRole)
     frameworkBuilder.setCheckpoint(true)
 
     val driver = new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master)
