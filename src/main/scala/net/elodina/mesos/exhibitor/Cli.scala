@@ -91,6 +91,8 @@ object Cli {
 
         Config.master = config(ConfigNames.MASTER)
         config.get(ConfigNames.USER).foreach(user => Config.user = user)
+        Config.principal = config.get(ConfigNames.PRINCIPAL)
+        Config.secret = config.get(ConfigNames.SECRET)
         config.get(ConfigNames.FRAMEWORK_NAME).foreach(name => Config.frameworkName = name)
         config.get(ConfigNames.FRAMEWORK_TIMEOUT).foreach(timeout => Config.frameworkTimeout = Duration(timeout))
         config.get(ConfigNames.FRAMEWORK_ROLE).foreach(role => Config.frameworkRole = role)
@@ -349,6 +351,14 @@ object Cli {
 
       opt[String]('u', ConfigNames.USER).optional().text("Mesos user. Defaults to current system user.").action { (value, config) =>
         config.updated(ConfigNames.USER, value)
+      }
+
+      opt[String](ConfigNames.PRINCIPAL).optional().text("Principal (username) used to register framework.").action { (value, config) =>
+        config.updated(ConfigNames.PRINCIPAL, value)
+      }
+
+      opt[String](ConfigNames.SECRET).optional().text("Secret (password) used to register framework.").action { (value, config) =>
+        config.updated(ConfigNames.SECRET, value)
       }
 
       opt[String](ConfigNames.FRAMEWORK_NAME).optional().text("Mesos framework name. Defaults to exhibitor. Optional").action { (value, config) =>

@@ -4,6 +4,7 @@ import java.util
 import java.util.concurrent.TimeUnit
 import java.util.{Collections, Date}
 
+import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.Util.Str
 import net.elodina.mesos.exhibitor.exhibitorapi._
 import org.apache.log4j._
@@ -39,7 +40,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
     frameworkBuilder.setRole(Config.frameworkRole)
     frameworkBuilder.setCheckpoint(true)
 
-    val driver = new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master)
+    val creds = for {
+      principal <- Config.principal
+      secret <- Config.secret
+    } yield (principal, secret)
+
+    val driver = creds.map { case (principal, secret) =>
+      frameworkBuilder.setPrincipal(principal)
+
+      new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master, Credential.newBuilder()
+        .setPrincipal(principal)
+        .setSecret(ByteString.copyFromUtf8(secret))
+        .build())
+    }.getOrElse(new MesosSchedulerDriver(this, frameworkBuilder.build, Config.master))
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() {
@@ -256,6 +269,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
             Thread.sleep(Config.ensembleModifyBackoff)
             tryAddToEnsemble(retriesLeft - 1)
           } else throw new IllegalStateException(failureMessage)
+        case (None, None) => throw new IllegalStateException("Received unexpected getSharedConfig() state, probably a bug")
       }
     }
 
@@ -319,6 +333,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
             Thread.sleep(Config.ensembleModifyBackoff)
             tryRemoveFromEnsemble(aliveServer, retriesLeft - 1)
           } else throw new IllegalStateException(failureMessage)
+        case (None, None) => throw new IllegalStateException("Received unexpected getSharedConfig() state, probably a bug")
       }
     }
 
