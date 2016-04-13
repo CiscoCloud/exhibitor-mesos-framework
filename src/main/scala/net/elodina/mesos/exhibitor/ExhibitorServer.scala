@@ -18,12 +18,14 @@
 
 package net.elodina.mesos.exhibitor
 
-import java.io.File
+import java.io.{Closeable, File}
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
 import net.elodina.mesos.exhibitor.exhibitorapi.{ExhibitorAPIClient, SharedConfig}
 import org.apache.log4j.Logger
+
+import scala.collection.JavaConversions._
 
 trait Server {
   def isStarted: Boolean
@@ -42,6 +44,7 @@ class ExhibitorServer extends Server {
 
   private val logger = Logger.getLogger(classOf[ExhibitorServer])
   @volatile var server: AnyRef = null
+  @volatile var creator: AnyRef = null
 
   private var config: TaskConfig = null
   private var sharedConfig: SharedConfig = null
@@ -57,7 +60,9 @@ class ExhibitorServer extends Server {
 
     Thread.currentThread().setContextClassLoader(ExhibitorServer.loader)
 
-    server = ExhibitorServer.newServer(config.exhibitorConfig.toMap)
+    val (exhibitorServer, exhibitorCreator) = ExhibitorServer.newServer(config.exhibitorConfig.toMap)
+    server = exhibitorServer
+    creator = exhibitorCreator
 
     logger.info("Starting Exhibitor Server")
     server.getClass.getMethod("start").invoke(server)
@@ -78,15 +83,16 @@ class ExhibitorServer extends Server {
         val shutdownSignaled = shutdownSignaledField.get(server)
         shutdownSignaled.getClass.getMethod("set", classOf[Boolean]).invoke(shutdownSignaled, true: java.lang.Boolean)
         server.getClass.getMethod("close").invoke(server)
+
+        val closeableUtilsClass = ExhibitorServer.loader.loadClass("org.apache.curator.utils.CloseableUtils")
+        val closeables = creator.getClass.getMethod("getCloseables").invoke(creator).asInstanceOf[java.lang.Iterable[Closeable]]
+        for (closeable <- closeables) {
+          closeableUtilsClass.getMethod("closeQuietly", classOf[Closeable]).invoke(null, closeable)
+        }
       }
 
       server = null
     }
-    //TODO
-    //for ( Closeable closeable : creator.getCloseables() )
-    //{
-    //  CloseableUtils.closeQuietly(closeable);
-    //}
   }
 
   private def listenForConfigChanges() {
@@ -159,7 +165,7 @@ object ExhibitorServer {
     }
   }
 
-  def newServer(props: Map[String, String]): AnyRef = {
+  def newServer(props: Map[String, String]): (AnyRef, AnyRef) = {
     val params = props.flatMap { case (key, value) =>
       Array(s"--$key", value)
     }.toArray
@@ -188,6 +194,6 @@ object ExhibitorServer {
     val exhibitorMain = exhibitorMainClass.getConstructor(backupProviderClass, configProviderClass, builderClass, Integer.TYPE, securityHandlerClass, securityArgumentsClass)
       .newInstance(backupProvider, configProvider, builder, httpPort, securityHandler, securityArguments).asInstanceOf[AnyRef]
 
-    exhibitorMain
+    (exhibitorMain, exhibitorCreator)
   }
 }
