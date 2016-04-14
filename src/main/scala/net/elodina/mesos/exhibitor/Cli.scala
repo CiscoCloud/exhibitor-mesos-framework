@@ -294,6 +294,7 @@ object Cli {
     }
     if (server.constraints.nonEmpty)
       printLine(s"constraints: ${Util.formatConstraints(server.constraints)}", indent + 1)
+    printFailover(server.failover, indent + 1)
     printStickiness(server.stickiness, indent + 1)
     printTaskConfig(server.config, indent + 1)
     exhibitorClusterView.foreach(x => printExhibitorClusterStateView(x, indent + 1))
@@ -318,6 +319,14 @@ object Cli {
     stickinessStr += stickiness.hostname.map(h => ", hostname:" + h).getOrElse("")
     stickinessStr += stickiness.stopTime.map(s => ", expires:" + Repr.dateTime(s)).getOrElse("")
     printLine(stickinessStr, indent)
+  }
+
+  private def printFailover(failover: Failover, indent: Int) {
+    var failoverStr = "failover:"
+    failoverStr += " delay:" + failover.delay
+    failoverStr += ", max-delay:" + failover.maxDelay
+    failover.maxTries.foreach(tries => failoverStr += ", max-tries:" + tries)
+    printLine(failoverStr, indent)
   }
 
   private def printTaskConfig(config: TaskConfig, indent: Int) {
@@ -445,6 +454,18 @@ object Cli {
 
       opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).").action { (value, config) =>
         config.updated(ConfigNames.STICKINESS_PERIOD, value)
+      }
+
+      opt[String](ConfigNames.FAILOVER_DELAY).optional().text("Failover delay (10s, 5m, 3h).").action { (value, config) =>
+        config.updated(ConfigNames.FAILOVER_DELAY, value)
+      }
+
+      opt[String](ConfigNames.FAILOVER_MAX_DELAY).optional().text("Max failover delay. See failoverDelay.").action { (value, config) =>
+        config.updated(ConfigNames.FAILOVER_MAX_DELAY, value)
+      }
+
+      opt[String](ConfigNames.FAILOVER_MAX_TRIES).optional().text("Max failover tries. Default - none").action { (value, config) =>
+        config.updated(ConfigNames.FAILOVER_MAX_TRIES, value)
       }
 
       // Exhibitor configs

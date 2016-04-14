@@ -41,6 +41,7 @@ case class Exhibitor(id: String) {
   private[exhibitor] var state: Exhibitor.State = Exhibitor.Added
 
   private[exhibitor] var stickiness = Stickiness()
+  private[exhibitor] var failover = new Failover()
 
   def createTask(offer: Offer): TaskInfo = {
     val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
@@ -148,6 +149,14 @@ case class Exhibitor(id: String) {
 
   def registerStart(hostname: String): Unit = {
     stickiness.registerStart(hostname)
+    failover.resetFailures()
+  }
+
+  def registerStop(now: Date = new Date(), failed: Boolean = false): Unit = {
+    if (!failed || failover.failures == 0) stickiness.registerStop(now)
+
+    if (failed) failover.registerFailure(now)
+    else failover.resetFailures()
   }
 }
 
@@ -191,7 +200,8 @@ object Exhibitor {
         "task" -> Option(es.task),
         "constraints" -> Util.formatConstraints(es.constraints),
         "config" -> es.config,
-        "stickiness" -> es.stickiness
+        "stickiness" -> es.stickiness,
+        "failover" -> es.failover
       )
     }
   }
@@ -202,7 +212,8 @@ object Exhibitor {
       (__ \ 'task).readNullable[Task] and
       (__ \ 'constraints).read[String].map(Constraint.parse) and
       (__ \ 'config).read[TaskConfig] and
-      (__ \ 'stickiness).read[Stickiness]) ((id, state, task, constraints, config, stickiness) => {
+      (__ \ 'stickiness).read[Stickiness] and
+      (__ \ 'failover).read[Failover]) ((id, state, task, constraints, config, stickiness, failover) => {
     val server = Exhibitor(id)
     state match {
       case "Added" => server.state = Added
@@ -221,6 +232,7 @@ object Exhibitor {
     server.config.hostname = config.hostname
     server.config.ports = config.ports
     server.stickiness = stickiness
+    server.failover = failover
     server
   })
 }

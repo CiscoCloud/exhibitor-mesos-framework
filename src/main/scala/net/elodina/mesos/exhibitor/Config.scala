@@ -71,6 +71,9 @@ object ConfigNames {
   final val TIMEOUT = "timeout"
   final val SHARED_CONFIG_CHANGE_BACKOFF = "configchangebackoff"
   final val STICKINESS_PERIOD = "stickiness-period"
+  final val FAILOVER_DELAY = "failover-delay"
+  final val FAILOVER_MAX_DELAY = "failover-max-delay"
+  final val FAILOVER_MAX_TRIES = "failover-max-tries"
 
   final val SHARED_CONFIG_TYPE = "configtype"
   final val SHARED_CONFIG_CHECK_MS = "configcheckms"
