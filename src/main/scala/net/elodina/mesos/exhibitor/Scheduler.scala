@@ -4,7 +4,7 @@ import java.util
 import java.util.concurrent.TimeUnit
 import java.util.{Collections, Date}
 
-import _root_.net.elodina.mesos.util.Repr
+import net.elodina.mesos.util.Repr
 import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.Util.Str
 import net.elodina.mesos.exhibitor.exhibitorapi._
@@ -127,16 +127,15 @@ object Scheduler extends org.apache.mesos.Scheduler {
         logger.info(s"Declined offer:\n  $declineReason")
       }
     }
-
     reconcileTasks()
     Scheduler.cluster.save()
   }
 
   private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
-    cluster.servers(Exhibitor.Stopped) match {
+    cluster.servers(Exhibitor.Stopped).filterNot(e => e.failover.isWaitingDelay(new Date())) match {
       case Nil => Some("all servers are running")
       case servers =>
-        val reason = servers.filterNot(e => e.failover.isWaitingDelay(new Date())).flatMap { server =>
+        val reason = servers.flatMap { server =>
           server.matches(offer, new Date(), otherTasksAttributes) match {
             case Some(declineReason) => Some(s"server ${server.id}: $declineReason")
             case None =>
@@ -212,9 +211,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
         server.config.hostname = ""
         server.registerStop(new Date(), failed = true)
         if (server.failover.isMaxTriesExceeded) {
-          server.state = Exhibitor.Stopped
-        } else {
           server.state = Exhibitor.Added
+        } else {
+          server.state = Exhibitor.Stopped
         }
         logFailureStatus(server)
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")

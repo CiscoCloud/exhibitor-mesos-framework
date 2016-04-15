@@ -106,7 +106,8 @@ class CliTest extends MesosTestCase {
   def config() {
     Scheduler.cluster.addServer(Exhibitor("0"))
 
-    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55 --stickiness-period 5m")
+    exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55 --stickiness-period 5m " +
+      "--failover-delay 30s --failover-max-delay 1h --failover-max-tries 5")
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
     assertEquals(1, serverOpt.get.config.ports.size)
@@ -115,6 +116,9 @@ class CliTest extends MesosTestCase {
     assertContains("zkconfigconnect: 192.168.3.1:2181")
     assertContains("zookeeper-install-directory: /tmp/zookeeper")
     assertEquals(serverOpt.get.stickiness.period.ms, new Period("5m").ms)
+    assertEquals(serverOpt.get.failover.delay.ms, new Period("30s").ms)
+    assertEquals(serverOpt.get.failover.maxDelay.ms, new Period("1h").ms)
+    assertEquals(serverOpt.get.failover.maxTries, Some(5))
   }
 
   @Test

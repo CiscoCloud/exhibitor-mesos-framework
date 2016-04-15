@@ -62,7 +62,8 @@ class HttpServerTest extends MesosTestCase {
   @Test
   def configServer() {
     sendRequest("/add", parseMap("id=0"))
-    val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper,stickiness-period=5m")).as[ApiResponse]
+    val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper,stickiness-period=5m," +
+      "failover-delay=30s,failover-max-delay=1m,failover-max-tries=5")).as[ApiResponse]
 
     val serverOpt = Scheduler.cluster.getServer("0")
     assertNotEquals(None, serverOpt)
@@ -72,6 +73,9 @@ class HttpServerTest extends MesosTestCase {
     assertEquals(mutable.Map("zkconfigconnect" -> "192.168.3.1:2181"), server.config.exhibitorConfig)
     assertEquals(server.config.sharedConfigOverride(ConfigNames.ZOOKEEPER_INSTALL_DIRECTORY), "/tmp/zookeeper")
     assertEquals(new Period("5m").ms, server.stickiness.period.ms)
+    assertEquals(new Period("30s").ms, server.failover.delay.ms)
+    assertEquals(new Period("1m").ms, server.failover.maxDelay.ms)
+    assertEquals(Some(5), server.failover.maxTries)
 
     assertTrue(response.success)
     assertTrue(response.message.contains("Updated configuration"))

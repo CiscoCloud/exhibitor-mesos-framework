@@ -20,6 +20,7 @@ package net.elodina.mesos.exhibitor
 
 import java.util.Date
 
+import net.elodina.mesos.util.Period
 import org.junit.Assert._
 import org.junit.{Before, Test}
 import play.api.libs.json.Json
@@ -246,6 +247,88 @@ class ExhibitorTest extends MesosTestCase {
     stickiness.registerStart("host1")
     assertEquals(Some("host1"), stickiness.hostname)
     assertTrue(stickiness.stopTime.isEmpty)
+  }
+
+  // Failover
+  @Test
+  def failover_currentDelay {
+    val failover = new Failover(new Period("1s"), new Period("5s"))
+
+    failover.failures = 0
+    assertEquals(new Period("0s"), failover.currentDelay)
+
+    failover.failures = 1
+    assertEquals(new Period("1s"), failover.currentDelay)
+
+    failover.failures = 2
+    assertEquals(new Period("2s"), failover.currentDelay)
+
+    failover.failures = 3
+    assertEquals(new Period("4s"), failover.currentDelay)
+
+    failover.failures = 4
+    assertEquals(new Period("5s"), failover.currentDelay)
+
+    failover.failures = 100
+    assertEquals(new Period("5s"), failover.currentDelay)
+  }
+
+  @Test
+  def failover_delayExpires {
+    val failover = new Failover(new Period("1s"))
+    assertEquals(new Date(0), failover.delayExpires)
+
+    failover.registerFailure(new Date(0))
+    assertEquals(new Date(1000), failover.delayExpires)
+
+    failover.failureTime = Some(new Date(1000))
+    assertEquals(new Date(2000), failover.delayExpires)
+  }
+
+  @Test
+  def failover_isWaitingDelay {
+    val failover = new Failover(new Period("1s"))
+    assertFalse(failover.isWaitingDelay(new Date(0)))
+
+    failover.registerFailure(new Date(0))
+
+    assertTrue(failover.isWaitingDelay(new Date(0)))
+    assertTrue(failover.isWaitingDelay(new Date(500)))
+    assertTrue(failover.isWaitingDelay(new Date(999)))
+    assertFalse(failover.isWaitingDelay(new Date(1000)))
+  }
+
+  @Test
+  def failover_isMaxTriesExceeded {
+    val failover = new Failover()
+
+    failover.failures = 100
+    assertFalse(failover.isMaxTriesExceeded)
+
+    failover.maxTries = Some(50)
+    assertTrue(failover.isMaxTriesExceeded)
+  }
+
+  @Test
+  def failover_registerFailure_resetFailures {
+    val failover = new Failover()
+    assertEquals(0, failover.failures)
+    assertTrue(failover.failureTime.isEmpty)
+
+    failover.registerFailure(new Date(1))
+    assertEquals(1, failover.failures)
+    assertEquals(new Date(1), failover.failureTime.get)
+
+    failover.registerFailure(new Date(2))
+    assertEquals(2, failover.failures)
+    assertEquals(new Date(2), failover.failureTime.get)
+
+    failover.resetFailures()
+    assertEquals(0, failover.failures)
+    assertTrue(failover.failureTime.isEmpty)
+
+    failover.registerFailure()
+    assertEquals(1, failover.failures)
   }
 }
 
