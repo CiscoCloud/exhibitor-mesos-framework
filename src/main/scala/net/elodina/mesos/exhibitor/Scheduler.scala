@@ -4,6 +4,7 @@ import java.util
 import java.util.concurrent.TimeUnit
 import java.util.{Collections, Date}
 
+import net.elodina.mesos.util.Repr
 import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.Util.Str
 import net.elodina.mesos.exhibitor.exhibitorapi._
@@ -126,13 +127,12 @@ object Scheduler extends org.apache.mesos.Scheduler {
         logger.info(s"Declined offer:\n  $declineReason")
       }
     }
-
     reconcileTasks()
     Scheduler.cluster.save()
   }
 
   private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
-    cluster.servers(Exhibitor.Stopped) match {
+    cluster.servers(Exhibitor.Stopped).filterNot(e => e.failover.isWaitingDelay(new Date())) match {
       case Nil => Some("all servers are running")
       case servers =>
         val reason = servers.flatMap { server =>
@@ -207,12 +207,34 @@ object Scheduler extends org.apache.mesos.Scheduler {
   private def onServerFailed(serverOpt: Option[Exhibitor], status: TaskStatus) {
     serverOpt match {
       case Some(server) =>
-        server.state = Exhibitor.Stopped
         server.task = null
         server.config.hostname = ""
-        server.stickiness.registerStop()
+        server.registerStop(new Date(), failed = true)
+        if (server.failover.isMaxTriesExceeded) {
+          server.state = Exhibitor.Added
+        } else {
+          server.state = Exhibitor.Stopped
+        }
+        logFailureStatus(server)
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }
+  }
+
+  private def logFailureStatus(server: Exhibitor): Unit = {
+    var msg = s"Server ${server.id} failed ${server.failover.failures}"
+    server.failover.maxTries.foreach {
+      tries => msg += "/" + tries
+    }
+
+    if (!server.failover.isMaxTriesExceeded) {
+      msg += ", waiting " + server.failover.currentDelay
+      msg += ", next start ~ " + Repr.dateTime(server.failover.delayExpires)
+    } else {
+      msg += ", failure limit exceeded"
+      msg += ", deactivating server"
+    }
+
+    logger.info(msg)
   }
 
   private def onServerFinished(serverOpt: Option[Exhibitor], status: TaskStatus) {
@@ -221,7 +243,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         server.state = Exhibitor.Added
         server.task = null
         server.config.hostname = ""
-        server.stickiness.registerStop()
+        server.registerStop(new Date(), failed = false)
         logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
     }
@@ -233,6 +255,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
       server.state = Exhibitor.Added
+      server.failover.resetFailures()
       server
     }
   }

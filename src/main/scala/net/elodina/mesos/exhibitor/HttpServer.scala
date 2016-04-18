@@ -199,6 +199,7 @@ object HttpServer {
           val server = Scheduler.cluster.getServer(id).get
           if (server.state == Exhibitor.Added) {
             server.state = Exhibitor.Stopped
+            server.failover.resetFailures()
             logger.info(s"Starting server $id")
           } else logger.warn(s"Server $id already started")
           server
@@ -272,6 +273,9 @@ object HttpServer {
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
             case (ConfigNames.PORT, Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
             case (ConfigNames.STICKINESS_PERIOD, Array(stickinessPeriod)) => server.stickiness.period = new Period(stickinessPeriod)
+            case (ConfigNames.FAILOVER_DELAY, Array(failoverDelay)) => server.failover.delay = new Period(failoverDelay)
+            case (ConfigNames.FAILOVER_MAX_DELAY, Array(failoverMaxDelay)) => server.failover.maxDelay = new Period(failoverMaxDelay)
+            case (ConfigNames.FAILOVER_MAX_TRIES, Array(failoverMaxTries)) => server.failover.maxTries = if (failoverMaxTries != "") Some(Integer.valueOf(failoverMaxTries)) else None
             case other => logger.debug(s"Got invalid configuration value: $other")
           }
           server

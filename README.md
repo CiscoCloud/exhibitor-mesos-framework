@@ -118,6 +118,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m
     exhibitor config:
     shared config overrides:
@@ -136,6 +137,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m
     exhibitor config:
     shared config overrides:
@@ -156,6 +158,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
@@ -181,6 +184,7 @@ cluster:
     id: 0
     state: Running
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
@@ -205,6 +209,7 @@ cluster:
     state: Running
     endpoint: http://slave0:31000/exhibitor/v1/ui/index.html
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
@@ -259,6 +264,7 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
     stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
@@ -348,6 +354,12 @@ Usage: config <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   --stickiness-period <value>
         Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).
+  --failover-delay <value>
+        Failover delay (10s, 5m, 3h).
+  --failover-max-delay <value>
+        Max failover delay. See failoverDelay.
+  --failover-max-tries <value>
+        Max failover tries. Default - none
   --configtype <value>
         Config type to use: s3 or zookeeper. Optional.
   --configcheckms <value>
