@@ -187,6 +187,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
           if (server.state != Exhibitor.Running) {
             server.state = Exhibitor.Running
             server.registerStart(server.task.hostname)
+            server.config.exhibitorHostname = status.getData.toStringUtf8
             addToEnsemble(server).onFailure { case t =>
               logger.info(s"Failed to add server ${server.id} to ensemble, force fail")
               if (server.task != null) {
@@ -209,6 +210,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       case Some(server) =>
         server.task = null
         server.config.hostname = ""
+        server.config.exhibitorHostname = ""
         server.registerStop(new Date(), failed = true)
         if (server.failover.isMaxTriesExceeded) {
           server.state = Exhibitor.Added
@@ -243,6 +245,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         server.state = Exhibitor.Added
         server.task = null
         server.config.hostname = ""
+        server.config.exhibitorHostname = ""
         server.registerStop(new Date(), failed = false)
         logger.info(s"Task ${status.getTaskId.getValue} has finished")
       case None => logger.info(s"Got ${status.getState} for unknown/stopped server with task ${status.getTaskId}")
@@ -307,7 +310,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
         }
       }
 
-      val updatedServersSpec = (s"S:${server.config.id}:${server.config.hostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
+      val updatedServersSpec = (s"S:${server.config.id}:${server.config.exhibitorHostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
         srv.split(":") match {
           // ignore duplicate ids or unknown instances
           case Array(_, id, _) if id == server.id || !cluster.contains(id) => servers
@@ -363,7 +366,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     def trySaveSharedConfig(sharedConfig: SharedConfig, aliveServer: Exhibitor, retriesLeft: Int) {
       val updatedServersSpec = sharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
         srv.split(":") match {
-          case Array(_, _, serverHost) if serverHost == server.config.hostname => servers
+          case Array(_, _, serverHost) if serverHost == server.config.exhibitorHostname => servers
           case Array(_, _, serverHost) => srv :: servers
           case _ => servers
         }

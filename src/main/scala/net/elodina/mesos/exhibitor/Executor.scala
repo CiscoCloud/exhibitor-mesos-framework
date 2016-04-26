@@ -19,7 +19,9 @@
 package net.elodina.mesos.exhibitor
 
 import java.io.{PrintWriter, StringWriter}
+import java.net.InetAddress
 
+import com.google.protobuf.ByteString
 import org.apache.log4j._
 import org.apache.mesos.Protos._
 import org.apache.mesos.{ExecutorDriver, MesosExecutorDriver}
@@ -59,7 +61,8 @@ object Executor extends org.apache.mesos.Executor {
 
         try {
           exhibitor.start(Json.parse(task.getData.toStringUtf8).as[TaskConfig])
-          driver.sendStatusUpdate(TaskStatus.newBuilder().setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING).build)
+          driver.sendStatusUpdate(TaskStatus.newBuilder().setTaskId(task.getTaskId).setState(TaskState.TASK_RUNNING)
+            .setData(ByteString.copyFromUtf8(InetAddress.getLocalHost.getHostName)).build)
           exhibitor.await()
 
           driver.sendStatusUpdate(TaskStatus.newBuilder().setTaskId(task.getTaskId).setState(TaskState.TASK_FINISHED).build)
