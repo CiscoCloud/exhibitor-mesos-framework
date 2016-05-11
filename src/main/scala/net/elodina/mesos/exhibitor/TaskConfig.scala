@@ -6,7 +6,7 @@ import play.api.libs.json._
 import scala.collection.mutable
 
 case class TaskConfig(exhibitorConfig: mutable.Map[String, String], sharedConfigOverride: mutable.Map[String, String], id: String, var hostname: String = "",
-                      var exhibitorHostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var ports: List[Util.Range] = Nil)
+                      var exhibitorHostname: String = "", var sharedConfigChangeBackoff: Long = 10000, var cpus: Double = 0.2, var mem: Double = 256, var docker: Boolean = false, var ports: List[Util.Range] = Nil)
 
 object TaskConfig {
   implicit val reader = (
@@ -18,6 +18,7 @@ object TaskConfig {
       (__ \ 'sharedConfigChangeBackoff).read[Long] and
       (__ \ 'cpu).read[Double] and
       (__ \ 'mem).read[Double] and
+      (__ \ 'docker).read[Boolean] and
       (__ \ 'ports).read[String].map(Util.Range.parseRanges)) (TaskConfig.apply _)
 
   implicit val writer = new Writes[TaskConfig] {
@@ -30,6 +31,7 @@ object TaskConfig {
         "exhibitorHostname" -> tc.exhibitorHostname,
         "cpu" -> tc.cpus,
         "mem" -> tc.mem,
+        "docker" -> tc.docker,
         "sharedConfigChangeBackoff" -> tc.sharedConfigChangeBackoff,
         "ports" -> tc.ports.mkString(",")
       )

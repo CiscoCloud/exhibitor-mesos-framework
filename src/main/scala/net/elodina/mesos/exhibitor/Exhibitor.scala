@@ -22,8 +22,8 @@ import java.util.{Date, UUID}
 
 import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
-import net.elodina.mesos.util.Period
 import org.apache.mesos.Protos
+import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsValue, Json, Writes, _}
@@ -51,8 +51,10 @@ case class Exhibitor(id: String) {
     this.config.exhibitorConfig.put(ConfigNames.PORT, port.toString)
     this.config.hostname = offer.getHostname
     val taskId = TaskID.newBuilder().setValue(id).build
+    val executor = if (this.config.docker) newDockerExecutor(this.id) else newExecutor(this.id)
+
     TaskInfo.newBuilder().setName(name).setTaskId(taskId).setSlaveId(offer.getSlaveId)
-      .setExecutor(newExecutor(this.id))
+      .setExecutor(executor)
       .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
       .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
       .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
@@ -136,6 +138,49 @@ case class Exhibitor(id: String) {
       .setCommand(commandBuilder)
       .setName(s"exhibitor-$id")
       .build
+  }
+
+  private[exhibitor] def newDockerExecutor(id: String): ExecutorInfo = {
+    val dockerBuilder = DockerInfo.newBuilder()
+    dockerBuilder
+      .setForcePullImage(false)
+      .setNetwork(DockerInfo.Network.HOST)
+      .setImage("elodina/exhibitor") //TODO versioning
+
+
+    val container = ContainerInfo.newBuilder()
+      .setType(ContainerInfo.Type.DOCKER)
+      .setDocker(dockerBuilder.build())
+
+    this.config.sharedConfigOverride.get(ConfigNames.ZOOKEEPER_DATA_DIRECTORY).map { dir =>
+      if (dir != ExhibitorServer.ZK_DATA_SANDBOX_DIR)
+        container.addVolumes(Volume.newBuilder().setHostPath(dir).setContainerPath(dir).setMode(Volume.Mode.RW))
+    }
+
+    this.config.sharedConfigOverride.get(ConfigNames.ZOOKEEPER_LOG_DIRECTORY).map { dir =>
+      if (dir != ExhibitorServer.ZK_LOG_SANDBOX_DIR)
+        container.addVolumes(Volume.newBuilder().setHostPath(dir).setContainerPath(dir).setMode(Volume.Mode.RW))
+    }
+
+    this.config.sharedConfigOverride.get(ConfigNames.LOG_INDEX_DIRECTORY).map { dir =>
+      if (dir != ExhibitorServer.ZK_LOG_INDEX_SANDBOX_DIR)
+        container.addVolumes(Volume.newBuilder().setHostPath(dir).setContainerPath(dir).setMode(Volume.Mode.RW))
+    }
+
+    val command = CommandInfo.newBuilder()
+      .setShell(false)
+      .setEnvironment(Environment.newBuilder().addVariables(Environment.Variable.newBuilder()
+        .setName("MESOS_NATIVE_JAVA_LIBRARY")
+        .setValue("/usr/local/lib/libmesos.so")))
+
+    if (Config.debug) command.addArguments("-Ddebug")
+
+    ExecutorInfo.newBuilder()
+      .setExecutorId(ExecutorID.newBuilder().setValue(Exhibitor.nextExecutorId(id)))
+      .setContainer(container)
+      .setName(s"exhibitor-$id")
+      .setCommand(command)
+      .build()
   }
 
   private[exhibitor] def getPort(offer: Offer): Option[Long] = {

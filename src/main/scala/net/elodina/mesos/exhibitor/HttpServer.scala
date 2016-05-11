@@ -160,6 +160,7 @@ object HttpServer {
       val ids = Scheduler.cluster.expandIds(idExpr)
       val cpus = Option(request.getParameter(ConfigNames.CPU))
       val mem = Option(request.getParameter(ConfigNames.MEM))
+      val docker = Option(request.getParameter(ConfigNames.DOCKER)).map(_.toBoolean)
       val constraints = Option(request.getParameter(ConfigNames.CONSTRAINTS))
       val backoff = Option(request.getParameter(ConfigNames.SHARED_CONFIG_CHANGE_BACKOFF))
       val ports = Option(request.getParameter(ConfigNames.PORT))
@@ -171,6 +172,7 @@ object HttpServer {
           val server = Exhibitor(id)
           cpus.foreach(cpus => server.config.cpus = cpus.toDouble)
           mem.foreach(mem => server.config.mem = mem.toDouble)
+          docker.foreach(docker => server.config.docker = docker)
           ports.foreach(ports => server.config.ports = Util.Range.parseRanges(ports))
           server.constraints ++= Constraint.parse(constraints.getOrElse("hostname=unique"))
           backoff.foreach(backoff => server.config.sharedConfigChangeBackoff = backoff.toLong)
@@ -272,6 +274,7 @@ object HttpServer {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
             case (ConfigNames.PORT, Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
+            case (ConfigNames.DOCKER, Array(docker)) => server.config.docker = docker.toBoolean
             case (ConfigNames.STICKINESS_PERIOD, Array(stickinessPeriod)) => server.stickiness.period = new Period(stickinessPeriod)
             case (ConfigNames.FAILOVER_DELAY, Array(failoverDelay)) => server.failover.delay = new Period(failoverDelay)
             case (ConfigNames.FAILOVER_MAX_DELAY, Array(failoverMaxDelay)) => server.failover.maxDelay = new Period(failoverMaxDelay)

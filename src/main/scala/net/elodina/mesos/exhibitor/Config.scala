@@ -68,6 +68,7 @@ object ConfigNames {
   final val MEM = "mem"
   final val CONSTRAINTS = "constraints"
   final val PORT = "port"
+  final val DOCKER = "docker"
   final val TIMEOUT = "timeout"
   final val SHARED_CONFIG_CHANGE_BACKOFF = "configchangebackoff"
   final val STICKINESS_PERIOD = "stickiness-period"

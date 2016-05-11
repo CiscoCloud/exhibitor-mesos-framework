@@ -429,6 +429,10 @@ object Cli {
       opt[String](ConfigNames.PORT).optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
         config.updated(ConfigNames.PORT, value)
       }
+
+      opt[Boolean](ConfigNames.DOCKER).optional().text("Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false").action { (value, config) =>
+        config.updated(ConfigNames.DOCKER, value.toString)
+      }
     }
 
     val start = new CliOptionParser("start <id>") {
@@ -450,6 +454,10 @@ object Cli {
     val config = new CliOptionParser("config <id>") {
       opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
         config.updated(ConfigNames.API, value)
+      }
+
+      opt[Boolean](ConfigNames.DOCKER).optional().text("Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false").action { (value, config) =>
+        config.updated(ConfigNames.DOCKER, value.toString)
       }
 
       opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).").action { (value, config) =>
