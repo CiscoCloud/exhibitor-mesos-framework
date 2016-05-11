@@ -46,7 +46,7 @@ case class Exhibitor(id: String) {
   def createTask(offer: Offer): TaskInfo = {
     val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
 
-    val name = s"exhibitor-${this.id}"
+    val name = s"${Config.frameworkName}-${this.id}"
     val id = Exhibitor.nextTaskId(this.id)
     this.config.exhibitorConfig.put(ConfigNames.PORT, port.toString)
     this.config.hostname = offer.getHostname
@@ -226,16 +226,11 @@ object Exhibitor {
     implicit val reader = Json.reads[Task]
   }
 
-  def nextTaskId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
+  def nextTaskId(serverId: String): String = s"${Config.frameworkName}-$serverId-${UUID.randomUUID()}"
 
-  def nextExecutorId(serverId: String): String = s"exhibitor-$serverId-${UUID.randomUUID()}"
+  def nextExecutorId(serverId: String): String = s"${Config.frameworkName}-$serverId-${UUID.randomUUID()}"
 
-  def idFromTaskId(taskId: String): String = {
-    taskId.split("-", 3) match {
-      case Array(_, id, _) => id
-      case _ => throw new IllegalArgumentException(taskId)
-    }
-  }
+  def idFromTaskId(taskId: String): String = taskId.dropRight(37).replace(Config.frameworkName + "-", "")
 
   implicit val writer = new Writes[Exhibitor] {
     def writes(es: Exhibitor): JsValue = {
