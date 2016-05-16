@@ -1,6 +1,6 @@
 FROM java:8
 
-MAINTAINER elodina
+MAINTAINER support@elodina.net
 
 RUN apt-get -y update
 RUN apt-get install -y lsb-release
