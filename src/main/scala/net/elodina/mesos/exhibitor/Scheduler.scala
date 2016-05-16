@@ -132,15 +132,20 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def acceptOffer(offer: Offer): Option[String] = {
-    cluster.servers(Exhibitor.Stopped).filterNot(e => e.failover.isWaitingDelay(new Date())) match {
+    val ensemble = cluster.defaultEnsemble()
+    ensemble.servers(Exhibitor.Stopped).filterNot(e => e.failover.isWaitingDelay(new Date())) match {
       case Nil => Some("all servers are running")
       case servers =>
         val reason = servers.flatMap { server =>
-          server.matches(offer, new Date(), otherTasksAttributes) match {
-            case Some(declineReason) => Some(s"server ${server.id}: $declineReason")
-            case None =>
-              launchTask(server, offer)
-              return None
+          Reservation.reserve(offer, ensemble, server) match {
+            case Right(reservation) =>
+              server.matches(offer, new Date(), otherTasksAttributes) match {
+                case Some(declineReason) => Some(s"server ${server.id}: $declineReason")
+                case None =>
+                  launchTask(reservation, ensemble, server, offer)
+                  return None
+              }
+            case Left(declineReason) => Some(declineReason)
           }
         }.mkString(", ")
 
@@ -148,8 +153,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
     }
   }
 
-  private def launchTask(server: Exhibitor, offer: Offer) {
-    val task = server.createTask(offer)
+  private def launchTask(reservation: Reservation, ensemble: Ensemble, server: Exhibitor, offer: Offer) {
+    ensemble.updatePorts(reservation)
+    val task = server.createTask(offer, reservation)
     val taskId = task.getTaskId.getValue
     val attributes = offer.getAttributesList.toList.filter(_.hasText).map(attr => attr.getName -> attr.getText.getValue).toMap
 
@@ -161,7 +167,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private def onServerStatus(driver: SchedulerDriver, status: TaskStatus) {
-    val server = cluster.getServer(Exhibitor.idFromTaskId(status.getTaskId.getValue))
+    val server = cluster.defaultEnsemble().getServer(Exhibitor.idFromTaskId(status.getTaskId.getValue))
 
     status.getState match {
       case TaskState.TASK_RUNNING =>
@@ -253,7 +259,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def stopServer(id: String): Option[Exhibitor] = {
-    cluster.getServer(id).map { server =>
+    cluster.defaultEnsemble().getServer(id).map { server =>
       if (server.state == Exhibitor.Staging || server.state == Exhibitor.Running)
         driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
 
@@ -264,10 +270,10 @@ object Scheduler extends org.apache.mesos.Scheduler {
   }
 
   private[exhibitor] def removeServer(id: String): Option[Exhibitor] = {
-    cluster.getServer(id).map { server =>
+    cluster.defaultEnsemble().getServer(id).map { server =>
       stopServer(id)
 
-      cluster.removeServer(server)
+      cluster.defaultEnsemble().removeServer(server)
       removeFromEnsemble(server).onFailure { case t =>
         logger.info(s"Failed to remove server ${server.id} from ensemble")
       }
@@ -306,6 +312,9 @@ object Scheduler extends org.apache.mesos.Scheduler {
           case ConfigNames.ZOOKEEPER_DATA_DIRECTORY => conf.copy(zookeeperDataDirectory = value)
           case ConfigNames.ZOOKEEPER_LOG_DIRECTORY => conf.copy(zookeeperLogDirectory = value)
           case ConfigNames.LOG_INDEX_DIRECTORY => conf.copy(logIndexDirectory = value)
+          case ConfigNames.CLIENT_PORT => conf.copy(ports = conf.ports.copy(client = value.toInt))
+          case ConfigNames.CONNECT_PORT => conf.copy(ports = conf.ports.copy(connect = value.toInt))
+          case ConfigNames.ELECTION_PORT => conf.copy(ports = conf.ports.copy(election = value.toInt))
           case invalid => throw new IllegalArgumentException(s"Unacceptable shared configuration parameter: $invalid")
         }
       }
@@ -313,7 +322,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       val updatedServersSpec = (s"S:${server.config.id}:${server.config.exhibitorHostname}" :: updatedSharedConfig.serversSpec.split(",").foldLeft(List[String]()) { (servers, srv) =>
         srv.split(":") match {
           // ignore duplicate ids or unknown instances
-          case Array(_, id, _) if id == server.id || !cluster.contains(id) => servers
+          case Array(_, id, _) if id == server.id || !cluster.defaultEnsemble().contains(id) => servers
           case Array(_, _, _) => srv :: servers
           case _ => servers
         }
@@ -386,7 +395,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
     Future {
       ensembleLock.synchronized {
-        cluster.findWithState(Exhibitor.Running) match {
+        cluster.defaultEnsemble().findWithState(Exhibitor.Running) match {
           case Some(aliveServer) => tryRemoveFromEnsemble(aliveServer, Config.ensembleModifyRetries)
           case None => logger.info(s"Server ${server.id} was the last alive in the cluster, no need to deregister it from ensemble.")
         }
@@ -410,7 +419,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
       else server.task.attributes.get(name)
     }
 
-    cluster.runningServers().flatMap(value(_, name))
+    cluster.defaultEnsemble().runningServers().flatMap(value(_, name))
   }
 
   private[exhibitor] val RECONCILE_DELAY = 10 seconds
@@ -421,19 +430,19 @@ object Scheduler extends org.apache.mesos.Scheduler {
 
   private[exhibitor] def reconcileTasks(force: Boolean = false, now: Date = new Date()) {
     if (now.getTime - reconcileTime.getTime >= RECONCILE_DELAY.toMillis) {
-      if (!cluster.isReconciling) reconciles = 0
+      if (!cluster.defaultEnsemble().isReconciling) reconciles = 0
       reconciles += 1
       reconcileTime = now
 
-      cluster.servers().foreach(s => if (s.task == null && s.state == Exhibitor.Running) s.state = Exhibitor.Stopped)
+      cluster.defaultEnsemble().servers().foreach(s => if (s.task == null && s.state == Exhibitor.Running) s.state = Exhibitor.Stopped)
 
       if (reconciles > RECONCILE_MAX_TRIES) {
-        cluster.servers().filter(s => s.isReconciling && s.task != null).foreach { server =>
+        cluster.defaultEnsemble().servers().filter(s => s.isReconciling && s.task != null).foreach { server =>
           logger.info(s"Reconciling exceeded $RECONCILE_MAX_TRIES tries for server ${server.id}, sending killTask for task ${server.task.id}")
           driver.killTask(TaskID.newBuilder().setValue(server.task.id).build())
         }
       } else {
-        val statuses = cluster.runningServers().flatMap { server =>
+        val statuses = cluster.defaultEnsemble().runningServers().flatMap { server =>
           if (force || server.isReconciling) {
             server.state = Exhibitor.Reconciling
             logger.info(s"Reconciling $reconciles/$RECONCILE_MAX_TRIES state of server ${server.id}, task ${server.task.id}")
@@ -454,7 +463,7 @@ object Scheduler extends org.apache.mesos.Scheduler {
     */
   def getClusterStatus: ClusterStatus = {
     val mesosServerStatuses =
-      cluster.servers().map { server =>
+      cluster.defaultEnsemble().servers().map { server =>
         val clusterViewOpt =
           server.state match {
             case Exhibitor.Running =>

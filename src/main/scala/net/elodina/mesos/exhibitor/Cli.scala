@@ -276,7 +276,13 @@ object Cli {
 
   private def printCluster(cluster: Cluster) {
     printLine("cluster:")
-    cluster.servers().foreach(s => printExhibitorServer(s, None, 1))
+    cluster.ensembles().foreach(s => printEnsemble(s, 1))
+  }
+
+  private def printEnsemble(ensemble: Ensemble, indent: Int = 0) {
+    printLine("ensemble:", indent)
+    printLine(s"id: ${ensemble.id}", indent)
+    ensemble.servers().foreach(s => printExhibitorServer(s, None, indent + 1))
   }
 
   private def printClusterStatus(clusterStatus: ClusterStatus) {
@@ -404,6 +410,10 @@ object Cli {
         super.showUsage
         printLine()
         printConstraintExamples()
+      }
+
+      opt[String](ConfigNames.ENSEMBLE).optional().text(s"Ensemble id to add this server to. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ENSEMBLE, value)
       }
 
       opt[String]('c', ConfigNames.CPU).optional().text(s"CPUs for server. Optional.").action { (value, config) =>

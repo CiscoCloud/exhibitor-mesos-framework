@@ -156,8 +156,10 @@ object HttpServer {
     }
 
     private def handleAddServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val ensemble = Scheduler.cluster.defaultEnsemble()
+
       val idExpr = request.getParameter(ConfigNames.ID)
-      val ids = Scheduler.cluster.expandIds(idExpr)
+      val ids = ensemble.expandIds(idExpr)
       val cpus = Option(request.getParameter(ConfigNames.CPU))
       val mem = Option(request.getParameter(ConfigNames.MEM))
       val docker = Option(request.getParameter(ConfigNames.DOCKER)).map(_.toBoolean)
@@ -165,7 +167,7 @@ object HttpServer {
       val backoff = Option(request.getParameter(ConfigNames.SHARED_CONFIG_CHANGE_BACKOFF))
       val ports = Option(request.getParameter(ConfigNames.PORT))
 
-      val existing = ids.filter(Scheduler.cluster.getServer(_).isDefined)
+      val existing = ids.filter(ensemble.getServer(_).isDefined)
       if (existing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${existing.mkString(",")} already exist", None)))
       else {
         val servers = ids.map { id =>
@@ -180,25 +182,27 @@ object HttpServer {
           server.config.sharedConfigOverride += ConfigNames.ZOOKEEPER_DATA_DIRECTORY -> ExhibitorServer.ZK_DATA_SANDBOX_DIR
           server.config.sharedConfigOverride += ConfigNames.ZOOKEEPER_LOG_DIRECTORY -> ExhibitorServer.ZK_LOG_SANDBOX_DIR
           server.config.sharedConfigOverride += ConfigNames.LOG_INDEX_DIRECTORY -> ExhibitorServer.ZK_LOG_INDEX_SANDBOX_DIR
-          Scheduler.cluster.addServer(server)
+          ensemble.addServer(server)
           server
         }
 
         Scheduler.cluster.save()
-        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Added servers $idExpr", Some(Cluster(servers)))))
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Added servers $idExpr", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
       }
     }
 
     private def handleStartServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val ensemble = Scheduler.cluster.defaultEnsemble()
+
       val idExpr = request.getParameter(ConfigNames.ID)
-      val ids = Scheduler.cluster.expandIds(idExpr)
+      val ids = ensemble.expandIds(idExpr)
       val timeout = Duration(Option(request.getParameter(ConfigNames.TIMEOUT)).getOrElse("60s"))
 
-      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      val missing = ids.filter(ensemble.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.map { id =>
-          val server = Scheduler.cluster.getServer(id).get
+          val server = ensemble.getServer(id).get
           if (server.state == Exhibitor.Added) {
             server.state = Exhibitor.Stopped
             server.failover.resetFailures()
@@ -209,35 +213,39 @@ object HttpServer {
 
         if (timeout.toMillis > 0) {
           val ok = servers.forall(_.waitFor(Exhibitor.Running, timeout))
-          if (ok) response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(servers)))))
+          if (ok) response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Started servers $idExpr", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
           else response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Start servers $idExpr timed out after $timeout", None)))
-        } else response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Servers $idExpr scheduled to start", Some(Cluster(servers)))))
+        } else response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Servers $idExpr scheduled to start", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
       }
     }
 
     private def handleStopServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter(ConfigNames.ID)
-      val ids = Scheduler.cluster.expandIds(idExpr)
+      val ensemble = Scheduler.cluster.defaultEnsemble()
 
-      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      val idExpr = request.getParameter(ConfigNames.ID)
+      val ids = ensemble.expandIds(idExpr)
+
+      val missing = ids.filter(ensemble.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.flatMap(Scheduler.stopServer)
         Scheduler.cluster.save()
-        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Stopped servers $idExpr", Some(Cluster(servers)))))
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Stopped servers $idExpr", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
       }
     }
 
     private def handleRemoveServer(request: HttpServletRequest, response: HttpServletResponse) {
-      val idExpr = request.getParameter(ConfigNames.ID)
-      val ids = Scheduler.cluster.expandIds(idExpr)
+      val ensemble = Scheduler.cluster.defaultEnsemble()
 
-      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      val idExpr = request.getParameter(ConfigNames.ID)
+      val ids = ensemble.expandIds(idExpr)
+
+      val missing = ids.filter(ensemble.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.flatMap(Scheduler.removeServer)
         Scheduler.cluster.save()
-        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Removed servers $idExpr", Some(Cluster(servers)))))
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Removed servers $idExpr", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
       }
     }
 
@@ -260,16 +268,18 @@ object HttpServer {
       ConfigNames.CLEANUP_MAX_FILES, ConfigNames.BACKUP_MAX_STORE_MS, ConfigNames.BACKUP_PERIOD_MS)
 
     private def handleConfigureServer(request: HttpServletRequest, response: HttpServletResponse) {
+      val ensemble = Scheduler.cluster.defaultEnsemble()
+
       val idExpr = request.getParameter(ConfigNames.ID)
-      val ids = Scheduler.cluster.expandIds(idExpr)
+      val ids = ensemble.expandIds(idExpr)
 
       logger.info(s"Received configurations for servers $idExpr: ${request.getParameterMap.toMap.map(entry => entry._1 -> entry._2.head)}")
 
-      val missing = ids.filter(Scheduler.cluster.getServer(_).isEmpty)
+      val missing = ids.filter(ensemble.getServer(_).isEmpty)
       if (missing.nonEmpty) response.getWriter.println(Json.toJson(ApiResponse(success = false, s"Servers ${missing.mkString(",")} do not exist", None)))
       else {
         val servers = ids.map { id =>
-          val server = Scheduler.cluster.getServer(id).get
+          val server = ensemble.getServer(id).get
           request.getParameterMap.toMap.foreach {
             case (key, Array(value)) if exhibitorConfigs.contains(key) => server.config.exhibitorConfig += key -> value
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
@@ -285,7 +295,7 @@ object HttpServer {
         }
 
         Scheduler.cluster.save()
-        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Updated configuration for servers $idExpr", Some(Cluster(servers)))))
+        response.getWriter.println(Json.toJson(ApiResponse(success = true, s"Updated configuration for servers $idExpr", Some(Cluster(List(ensemble.copy(initialServers = servers)))))))
       }
     }
   }

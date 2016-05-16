@@ -21,58 +21,26 @@ package net.elodina.mesos.exhibitor
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable
 
-case class Cluster(initialServers: List[Exhibitor] = Nil) {
+case class Cluster(initialEnsembles: List[Ensemble] = Nil) {
   private val storage = Cluster.newStorage(Config.storage)
   private[exhibitor] var frameworkId: Option[String] = None
 
-  private[exhibitor] val exhibitorServers = new ListBuffer[Exhibitor]
+  private[exhibitor] val exhibitorEnsembles: mutable.Map[String, Ensemble] = mutable.Map()
   //add anything that was passed to constructor
-  initialServers.foreach(exhibitorServers += _)
+  initialEnsembles.foreach(ensemble => exhibitorEnsembles += ensemble.id -> ensemble)
 
-  def servers(): List[Exhibitor] = this.exhibitorServers.toList
+  def ensembles(): List[Ensemble] = this.exhibitorEnsembles.values.toList
 
-  def servers(state: Exhibitor.State): List[Exhibitor] = servers().filter(_.state == state)
+  def ensemble(id: String): Option[Ensemble] = this.exhibitorEnsembles.get(id)
 
-  def runningServers(): List[Exhibitor] = servers().filter(_.task != null)
-
-  def getServer(id: String): Option[Exhibitor] = servers().find(_.id == id)
-
-  def findWithState(state: Exhibitor.State): Option[Exhibitor] = servers().find(_.state == state)
-
-  def addServer(server: Exhibitor): Boolean = {
-    servers().find(_.id == server.id) match {
-      case Some(_) => false
+  def defaultEnsemble(): Ensemble = {
+    this.exhibitorEnsembles.get("default") match {
+      case Some(ensemble) => ensemble
       case None =>
-        exhibitorServers += server
-        true
-    }
-  }
-
-  def removeServer(server: Exhibitor): Boolean = {
-    servers().find(_.id == server.id) match {
-      case Some(_) =>
-        exhibitorServers -= server
-        true
-      case None =>
-        false
-    }
-  }
-
-  def contains(id: String): Boolean = servers().exists(_.id == id)
-
-  def length() = servers().length
-
-  def clear() = exhibitorServers.clear()
-
-  def expandIds(expr: String): List[String] = {
-    if (expr == null || expr == "") throw new IllegalArgumentException("ID expression cannot be null or empty")
-    else {
-      expr.split(",").flatMap { part =>
-        if (part == "*") return servers().map(_.id)
-        else Util.Range(part).values.map(_.toString)
-      }.distinct.sorted.toList
+        this.exhibitorEnsembles += "default" -> Ensemble("default")
+        this.exhibitorEnsembles("default")
     }
   }
 
@@ -81,13 +49,11 @@ case class Cluster(initialServers: List[Exhibitor] = Nil) {
   def load() {
     storage.load(Cluster.reader).foreach { cluster =>
       this.frameworkId = cluster.frameworkId
-      cluster.servers().foreach(this.exhibitorServers += _)
+      cluster.ensembles().foreach(ensemble => this.exhibitorEnsembles += ensemble.id -> ensemble)
     }
   }
 
-  def isReconciling: Boolean = servers().exists(_.isReconciling)
-
-  override def toString: String = servers().toString()
+  override def toString: String = ensembles().toString()
 }
 
 object Cluster {
@@ -100,13 +66,22 @@ object Cluster {
   }
 
   implicit val writer = new Writes[Cluster] {
-    override def writes(o: Cluster): JsValue = Json.obj("frameworkid" -> o.frameworkId, "cluster" -> o.servers())
+    override def writes(o: Cluster): JsValue = Json.obj("frameworkid" -> o.frameworkId, "cluster" -> o.defaultEnsemble().servers())
   }
 
   implicit val reader = ((__ \ 'frameworkid).readNullable[String] and
-    (__ \ 'cluster).read[List[Exhibitor]]) ((frameworkId, servers) => {
-    val cluster = Cluster(servers)
+    (__ \ 'cluster).read[List[Exhibitor]]) ((frameworkId, exhibitors) => {
+    val cluster = Cluster(List(restoreEnsemble(exhibitors)))
     cluster.frameworkId = frameworkId
     cluster
   })
+
+  private def restoreEnsemble(servers: List[Exhibitor]): Ensemble = {
+    val exhibitorOpt = servers.headOption
+    val clientPort = exhibitorOpt.flatMap(_.config.sharedConfigOverride.get(ConfigNames.CLIENT_PORT).map(_.toInt)).getOrElse(-1)
+    val connectPort = exhibitorOpt.flatMap(_.config.sharedConfigOverride.get(ConfigNames.CONNECT_PORT).map(_.toInt)).getOrElse(-1)
+    val electionPort = exhibitorOpt.flatMap(_.config.sharedConfigOverride.get(ConfigNames.ELECTION_PORT).map(_.toInt)).getOrElse(-1)
+
+    Ensemble("default", clientPort, connectPort, electionPort, servers)
+  }
 }

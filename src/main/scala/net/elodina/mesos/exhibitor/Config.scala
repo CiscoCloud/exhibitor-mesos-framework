@@ -63,6 +63,8 @@ object ConfigNames {
   final val ENSEMBLE_MODIFY_RETRIES = "ensemble-modify-retries"
   final val ENSEMBLE_MODIFY_BACKOFF = "ensemble-modify-backoff"
 
+  final val ENSEMBLE = "ensemble"
+
   final val ID = "id"
   final val CPU = "cpu"
   final val MEM = "mem"

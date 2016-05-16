@@ -43,8 +43,8 @@ class HttpServerTest extends MesosTestCase {
   @Test
   def addServer() {
     val response = sendRequest("/add", parseMap("id=0,cpu=0.6,mem=128,port=3000..8000")).as[ApiResponse]
-    assertEquals(1, Scheduler.cluster.length())
-    val server = Scheduler.cluster.servers().head
+    assertEquals(1, Scheduler.cluster.defaultEnsemble().length())
+    val server = Scheduler.cluster.defaultEnsemble().servers().head
 
     assertEquals("0", server.id)
     assertEquals(0.6, server.config.cpus, 0.001)
@@ -56,7 +56,7 @@ class HttpServerTest extends MesosTestCase {
     assert(response.success)
     assertNotEquals(None, response.value)
 
-    ExhibitorTest.assertServerEquals(server, response.value.get.servers().head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.defaultEnsemble().servers().head)
   }
 
   @Test
@@ -65,7 +65,7 @@ class HttpServerTest extends MesosTestCase {
     val response = sendRequest("/config", parseMap("id=0,zkconfigconnect=192.168.3.1:2181,zookeeper-install-directory=/tmp/zookeeper,stickiness-period=5m," +
       "failover-delay=30s,failover-max-delay=1m,failover-max-tries=5")).as[ApiResponse]
 
-    val serverOpt = Scheduler.cluster.getServer("0")
+    val serverOpt = Scheduler.cluster.defaultEnsemble().getServer("0")
     assertNotEquals(None, serverOpt)
 
     val server = serverOpt.get
@@ -80,7 +80,7 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(response.success)
     assertTrue(response.message.contains("Updated configuration"))
     assertNotEquals(None, response.value)
-    ExhibitorTest.assertServerEquals(server, response.value.get.servers().head)
+    ExhibitorTest.assertServerEquals(server, response.value.get.defaultEnsemble().servers().head)
   }
 
   @Test
@@ -103,7 +103,7 @@ class HttpServerTest extends MesosTestCase {
     sendRequest("/add", parseMap("id=2"))
 
     sendRequest("/remove", parseMap("id=1"))
-    assertEquals(2, Scheduler.cluster.length())
+    assertEquals(2, Scheduler.cluster.defaultEnsemble().length())
   }
 
   @Test
@@ -114,12 +114,12 @@ class HttpServerTest extends MesosTestCase {
     assertTrue(startResponse.success)
     assertTrue(startResponse.message.contains("scheduled"))
     assertNotEquals(None, startResponse.value)
-    assertEquals(Exhibitor.Stopped, startResponse.value.get.servers().head.state)
+    assertEquals(Exhibitor.Stopped, startResponse.value.get.defaultEnsemble().servers().head.state)
 
     val stopResponse = sendRequest("/stop", parseMap("id=0")).as[ApiResponse]
     assertTrue(stopResponse.success)
     assertTrue(stopResponse.message.contains("Stopped servers"))
     assertNotEquals(None, stopResponse.value)
-    assertEquals(Exhibitor.Added, stopResponse.value.get.servers().head.state)
+    assertEquals(Exhibitor.Added, stopResponse.value.get.defaultEnsemble().servers().head.state)
   }
 }

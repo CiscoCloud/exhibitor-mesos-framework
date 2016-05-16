@@ -22,7 +22,6 @@ import java.util.{Date, UUID}
 
 import com.google.protobuf.ByteString
 import net.elodina.mesos.exhibitor.exhibitorapi.ExhibitorServerStatus
-import org.apache.mesos.Protos
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos._
 import play.api.libs.functional.syntax._
@@ -43,12 +42,13 @@ case class Exhibitor(id: String) {
   private[exhibitor] var stickiness = Stickiness()
   private[exhibitor] var failover = new Failover()
 
-  def createTask(offer: Offer): TaskInfo = {
-    val port = getPort(offer).getOrElse(throw new IllegalStateException("No suitable port"))
-
+  def createTask(offer: Offer, reservation: Reservation): TaskInfo = {
     val name = s"${Config.frameworkName}-${this.id}"
     val id = Exhibitor.nextTaskId(this.id)
-    this.config.exhibitorConfig.put(ConfigNames.PORT, port.toString)
+    this.config.exhibitorConfig.put(ConfigNames.PORT, reservation.uiPort.toString)
+    this.config.sharedConfigOverride.put(ConfigNames.CLIENT_PORT, reservation.clientPort.toString)
+    this.config.sharedConfigOverride.put(ConfigNames.CONNECT_PORT, reservation.connectPort.toString)
+    this.config.sharedConfigOverride.put(ConfigNames.ELECTION_PORT, reservation.electionPort.toString)
     this.config.hostname = offer.getHostname
     val taskId = TaskID.newBuilder().setValue(id).build
     val executor = if (this.config.docker) newDockerExecutor(this.id) else newExecutor(this.id)
@@ -56,28 +56,11 @@ case class Exhibitor(id: String) {
     TaskInfo.newBuilder().setName(name).setTaskId(taskId).setSlaveId(offer.getSlaveId)
       .setExecutor(executor)
       .setData(ByteString.copyFromUtf8(Json.stringify(Json.toJson(this.config))))
-      .addResources(Protos.Resource.newBuilder().setName("cpus").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.cpus)))
-      .addResources(Protos.Resource.newBuilder().setName("mem").setType(Protos.Value.Type.SCALAR).setScalar(Protos.Value.Scalar.newBuilder().setValue(this.config.mem)))
-      .addResources(Protos.Resource.newBuilder().setName("ports").setType(Protos.Value.Type.RANGES).setRanges(
-        Protos.Value.Ranges.newBuilder().addRange(Protos.Value.Range.newBuilder().setBegin(port).setEnd(port))
-      )).build
+      .addAllResources(reservation.toResources)
+      .build
   }
 
   def matches(offer: Offer, now: Date = new Date(), otherAttributes: String => List[String] = _ => Nil): Option[String] = {
-    val offerResources = offer.getResourcesList.toList.map(res => res.getName -> res).toMap
-
-    if (getPort(offer).isEmpty) return Some("no suitable port")
-
-    offerResources.get("cpus") match {
-      case Some(cpusResource) => if (cpusResource.getScalar.getValue < config.cpus) return Some(s"cpus ${cpusResource.getScalar.getValue} < ${config.cpus}")
-      case None => return Some("no cpus")
-    }
-
-    offerResources.get("mem") match {
-      case Some(memResource) => if (memResource.getScalar.getValue < config.mem) return Some(s"mem ${memResource.getScalar.getValue} < ${config.mem}")
-      case None => return Some("no mem")
-    }
-
     if (!stickiness.allowsHostname(offer.getHostname, now))
       return Some("hostname != stickiness host")
 
@@ -145,8 +128,7 @@ case class Exhibitor(id: String) {
     dockerBuilder
       .setForcePullImage(false)
       .setNetwork(DockerInfo.Network.HOST)
-      .setImage("elodina/exhibitor") //TODO versioning
-
+      .setImage("elodina/exhibitor:0.3.0.0")
 
     val container = ContainerInfo.newBuilder()
       .setType(ContainerInfo.Type.DOCKER)
@@ -169,9 +151,6 @@ case class Exhibitor(id: String) {
 
     val command = CommandInfo.newBuilder()
       .setShell(false)
-      .setEnvironment(Environment.newBuilder().addVariables(Environment.Variable.newBuilder()
-        .setName("MESOS_NATIVE_JAVA_LIBRARY")
-        .setValue("/usr/local/lib/libmesos.so")))
 
     if (Config.debug) command.addArguments("-Ddebug")
 
