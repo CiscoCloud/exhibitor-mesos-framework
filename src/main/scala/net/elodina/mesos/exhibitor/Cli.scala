@@ -100,6 +100,7 @@ object Cli {
         config.get(ConfigNames.ENSEMBLE_MODIFY_RETRIES).foreach(retries => Config.ensembleModifyRetries = retries.toInt)
         config.get(ConfigNames.ENSEMBLE_MODIFY_BACKOFF).foreach(backoff => Config.ensembleModifyBackoff = backoff.toLong)
         config.get(ConfigNames.DEBUG).foreach(debug => Config.debug = debug.toBoolean)
+        config.get(ConfigNames.EXECUTOR_DOCKER_IMAGE).foreach(dockerImage => Config.dockerImage = dockerImage)
 
         Scheduler.start()
       case None => throw CliError("Invalid arguments")
@@ -352,6 +353,9 @@ object Cli {
       case _ => config.ports.mkString(",")
     }
     printLine(s"port: $ports", indent)
+    printLine(s"docker: ${config.docker}", indent)
+    if (config.javaOptions.nonEmpty)
+      printLine(s"java options: ${Util.formatMap(config.javaOptions)}", indent)
   }
 
   private object Parsers {
@@ -402,6 +406,10 @@ object Cli {
 
       opt[Boolean]('d', ConfigNames.DEBUG).optional().text("Debug mode. Optional. Defaults to false.").action { (value, config) =>
         config.updated(ConfigNames.DEBUG, value.toString)
+      }
+
+      opt[String](ConfigNames.EXECUTOR_DOCKER_IMAGE).optional().text("Executor Docker image to use when Docker option is set to true. Optional").action { (value, config) =>
+        config.updated(ConfigNames.EXECUTOR_DOCKER_IMAGE, value)
       }
     }
 
@@ -663,6 +671,10 @@ object Cli {
 
       opt[String](ConfigNames.PORT).optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
         config.updated(ConfigNames.PORT, value)
+      }
+
+      opt[String](ConfigNames.JAVA_OPTIONS).optional().text("Additional java options to pass to executor. Optional").action { (value, config) =>
+        config.updated(ConfigNames.JAVA_OPTIONS, value)
       }
     }
 

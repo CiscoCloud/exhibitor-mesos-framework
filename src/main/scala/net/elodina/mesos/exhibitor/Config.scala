@@ -42,6 +42,8 @@ object Config {
   var ensembleModifyRetries: Int = 15
   var ensembleModifyBackoff: Long = 4000
 
+  var dockerImage: String = "elodina/exhibitor:0.3.0.0"
+
   def httpServerPort: Int = {
     val port = new URI(api).getPort
     if (port == -1) 80 else port
@@ -62,6 +64,7 @@ object ConfigNames {
   final val DEBUG = "debug"
   final val ENSEMBLE_MODIFY_RETRIES = "ensemble-modify-retries"
   final val ENSEMBLE_MODIFY_BACKOFF = "ensemble-modify-backoff"
+  final val EXECUTOR_DOCKER_IMAGE = "executor-docker-image"
 
   final val ENSEMBLE = "ensemble"
 
@@ -77,6 +80,7 @@ object ConfigNames {
   final val FAILOVER_DELAY = "failover-delay"
   final val FAILOVER_MAX_DELAY = "failover-max-delay"
   final val FAILOVER_MAX_TRIES = "failover-max-tries"
+  final val JAVA_OPTIONS = "java-options"
 
   final val SHARED_CONFIG_TYPE = "configtype"
   final val SHARED_CONFIG_CHECK_MS = "configcheckms"

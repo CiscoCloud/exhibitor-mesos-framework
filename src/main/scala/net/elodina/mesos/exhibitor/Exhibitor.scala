@@ -96,7 +96,10 @@ case class Exhibitor(id: String) {
 
   private[exhibitor] def newExecutor(id: String): ExecutorInfo = {
     val java = "$(find jdk* -maxdepth 0 -type d)" // find non-recursively a directory starting with "jdk"
-    val cmd = s"export PATH=$$MESOS_DIRECTORY/$java/bin:$$PATH && java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} net.elodina.mesos.exhibitor.Executor"
+    val javaOptions = this.config.javaOptions.map { case (k, v) =>
+        s"-D$k=$v"
+      }.mkString(" ")
+    val cmd = s"export PATH=$$MESOS_DIRECTORY/$java/bin:$$PATH && java -cp ${HttpServer.jar.getName}${if (Config.debug) " -Ddebug" else ""} $javaOptions net.elodina.mesos.exhibitor.Executor"
 
     val commandBuilder = CommandInfo.newBuilder()
     commandBuilder
@@ -128,7 +131,7 @@ case class Exhibitor(id: String) {
     dockerBuilder
       .setForcePullImage(false)
       .setNetwork(DockerInfo.Network.HOST)
-      .setImage("elodina/exhibitor:0.3.0.0")
+      .setImage(Config.dockerImage)
 
     val container = ContainerInfo.newBuilder()
       .setType(ContainerInfo.Type.DOCKER)
@@ -149,10 +152,20 @@ case class Exhibitor(id: String) {
         container.addVolumes(Volume.newBuilder().setHostPath(dir).setContainerPath(dir).setMode(Volume.Mode.RW))
     }
 
+    val javaOptions = (this.config.javaOptions.map {
+      case (k, v) if v.isEmpty => s"-D$k"
+      case (k, v) => s"-D$k=$v"
+    } ++ (Config.debug match {
+      case true => List("-Ddebug")
+      case false => Nil
+    })).mkString(" ")
+
     val command = CommandInfo.newBuilder()
       .setShell(false)
-
-    if (Config.debug) command.addArguments("-Ddebug")
+      .setEnvironment(Environment.newBuilder().addVariables(Environment.Variable
+        .newBuilder()
+        .setName("JAVA_OPTS")
+        .setValue(javaOptions)))
 
     ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder().setValue(Exhibitor.nextExecutorId(id)))
@@ -249,6 +262,8 @@ object Exhibitor {
     server.config.mem = config.mem
     server.config.sharedConfigChangeBackoff = config.sharedConfigChangeBackoff
     server.config.hostname = config.hostname
+    server.config.docker = config.docker
+    server.config.javaOptions = config.javaOptions
     server.config.ports = config.ports
     server.stickiness = stickiness
     server.failover = failover
