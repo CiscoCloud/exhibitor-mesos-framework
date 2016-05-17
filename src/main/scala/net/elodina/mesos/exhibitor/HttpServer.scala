@@ -285,6 +285,7 @@ object HttpServer {
             case (key, Array(value)) if sharedConfigs.contains(key) => server.config.sharedConfigOverride += key -> value
             case (ConfigNames.PORT, Array(ports)) => server.config.ports = Util.Range.parseRanges(ports)
             case (ConfigNames.DOCKER, Array(docker)) => server.config.docker = docker.toBoolean
+            case (ConfigNames.JAVA_OPTIONS, Array(javaOptions)) => server.config.javaOptions = Util.parseMap(javaOptions)
             case (ConfigNames.STICKINESS_PERIOD, Array(stickinessPeriod)) => server.stickiness.period = new Period(stickinessPeriod)
             case (ConfigNames.FAILOVER_DELAY, Array(failoverDelay)) => server.failover.delay = new Period(failoverDelay)
             case (ConfigNames.FAILOVER_MAX_DELAY, Array(failoverMaxDelay)) => server.failover.maxDelay = new Period(failoverMaxDelay)
