@@ -276,7 +276,13 @@ object Cli {
 
   private def printCluster(cluster: Cluster) {
     printLine("cluster:")
-    cluster.servers().foreach(s => printExhibitorServer(s, None, 1))
+    cluster.ensembles().foreach(s => printEnsemble(s, 1))
+  }
+
+  private def printEnsemble(ensemble: Ensemble, indent: Int = 0) {
+    printLine("ensemble:", indent)
+    printLine(s"id: ${ensemble.id}", indent)
+    ensemble.servers().foreach(s => printExhibitorServer(s, None, indent + 1))
   }
 
   private def printClusterStatus(clusterStatus: ClusterStatus) {
@@ -406,6 +412,10 @@ object Cli {
         printConstraintExamples()
       }
 
+      opt[String](ConfigNames.ENSEMBLE).optional().text(s"Ensemble id to add this server to. Optional.").action { (value, config) =>
+        config.updated(ConfigNames.ENSEMBLE, value)
+      }
+
       opt[String]('c', ConfigNames.CPU).optional().text(s"CPUs for server. Optional.").action { (value, config) =>
         config.updated(ConfigNames.CPU, value)
       }
@@ -429,6 +439,10 @@ object Cli {
       opt[String](ConfigNames.PORT).optional().text("Port ranges to accept, when offer is issued. Optional").action { (value, config) =>
         config.updated(ConfigNames.PORT, value)
       }
+
+      opt[Boolean](ConfigNames.DOCKER).optional().text("Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false").action { (value, config) =>
+        config.updated(ConfigNames.DOCKER, value.toString)
+      }
     }
 
     val start = new CliOptionParser("start <id>") {
@@ -450,6 +464,10 @@ object Cli {
     val config = new CliOptionParser("config <id>") {
       opt[String]('a', ConfigNames.API).optional().text(s"Binding host:port for http/artifact server. Optional if ${ConfigNames.API_ENV} env is set.").action { (value, config) =>
         config.updated(ConfigNames.API, value)
+      }
+
+      opt[Boolean](ConfigNames.DOCKER).optional().text("Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false").action { (value, config) =>
+        config.updated(ConfigNames.DOCKER, value.toString)
       }
 
       opt[String](ConfigNames.STICKINESS_PERIOD).optional().text("Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).").action { (value, config) =>

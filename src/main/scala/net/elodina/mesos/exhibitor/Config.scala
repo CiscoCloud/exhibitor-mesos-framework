@@ -63,11 +63,14 @@ object ConfigNames {
   final val ENSEMBLE_MODIFY_RETRIES = "ensemble-modify-retries"
   final val ENSEMBLE_MODIFY_BACKOFF = "ensemble-modify-backoff"
 
+  final val ENSEMBLE = "ensemble"
+
   final val ID = "id"
   final val CPU = "cpu"
   final val MEM = "mem"
   final val CONSTRAINTS = "constraints"
   final val PORT = "port"
+  final val DOCKER = "docker"
   final val TIMEOUT = "timeout"
   final val SHARED_CONFIG_CHANGE_BACKOFF = "configchangebackoff"
   final val STICKINESS_PERIOD = "stickiness-period"

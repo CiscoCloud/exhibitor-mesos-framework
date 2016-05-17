@@ -64,9 +64,9 @@ class CliTest extends MesosTestCase {
 
   @Test
   def status() {
-    Scheduler.cluster.addServer(Exhibitor("0"))
-    Scheduler.cluster.addServer(Exhibitor("1"))
-    Scheduler.cluster.addServer(Exhibitor("2"))
+    Scheduler.cluster.defaultEnsemble().addServer(Exhibitor("0"))
+    Scheduler.cluster.defaultEnsemble().addServer(Exhibitor("1"))
+    Scheduler.cluster.defaultEnsemble().addServer(Exhibitor("2"))
 
     exec("status")
     assertContains("id: 0")
@@ -83,8 +83,8 @@ class CliTest extends MesosTestCase {
     assertContains("cpu: 1.5")
     assertContains("sharedConfigChangeBackoff: 5000")
 
-    assertEquals(1, Scheduler.cluster.length())
-    val serverOpt = Scheduler.cluster.getServer("0")
+    assertEquals(1, Scheduler.cluster.defaultEnsemble().length())
+    val serverOpt = Scheduler.cluster.defaultEnsemble().getServer("0")
     assertNotEquals(None, serverOpt)
 
     val server = serverOpt.get
@@ -104,11 +104,11 @@ class CliTest extends MesosTestCase {
 
   @Test
   def config() {
-    Scheduler.cluster.addServer(Exhibitor("0"))
+    Scheduler.cluster.defaultEnsemble().addServer(Exhibitor("0"))
 
     exec("config 0 --zkconfigconnect 192.168.3.1:2181 --zookeeper-install-directory /tmp/zookeeper --port 33..55 --stickiness-period 5m " +
       "--failover-delay 30s --failover-max-delay 1h --failover-max-tries 5")
-    val serverOpt = Scheduler.cluster.getServer("0")
+    val serverOpt = Scheduler.cluster.defaultEnsemble().getServer("0")
     assertNotEquals(None, serverOpt)
     assertEquals(1, serverOpt.get.config.ports.size)
     assertEquals(serverOpt.get.config.ports.head.start, 33)
@@ -125,7 +125,7 @@ class CliTest extends MesosTestCase {
   def startStop() {
     val server0 = Exhibitor("0")
     server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
-    Scheduler.cluster.addServer(server0)
+    Scheduler.cluster.defaultEnsemble().addServer(server0)
 
     exec("start 0 --timeout 0ms")
     assertContains("scheduled")
@@ -141,7 +141,7 @@ class CliTest extends MesosTestCase {
   def startStopTimeout() {
     val server0 = Exhibitor("0")
     server0.task = Exhibitor.Task("exhibitor-0-slave0-31000", "", "", Map(), "master")
-    Scheduler.cluster.addServer(server0)
+    Scheduler.cluster.defaultEnsemble().addServer(server0)
 
     Try(exec("start 0 --timeout 1ms")) match {
       case Failure(e) if e.isInstanceOf[CliError] => assertTrue(e.getMessage, e.getMessage.contains("timed out"))
@@ -157,11 +157,11 @@ class CliTest extends MesosTestCase {
 
   @Test
   def remove() {
-    Scheduler.cluster.addServer(Exhibitor("0"))
+    Scheduler.cluster.defaultEnsemble().addServer(Exhibitor("0"))
     exec("remove 0")
 
     assertContains("Removed servers 0")
-    assertEquals(None, Scheduler.cluster.getServer("0"))
+    assertEquals(None, Scheduler.cluster.defaultEnsemble().getServer("0"))
   }
 
   @Test

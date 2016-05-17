@@ -329,6 +329,8 @@ Usage: add <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   --port <value>
         Port ranges to accept, when offer is issued. Optional
+  --docker <value>
+        Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false
 
 constraint examples:
   like:slave0    - value equals 'slave0'

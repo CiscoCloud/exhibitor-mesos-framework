@@ -47,7 +47,7 @@ class MesosTestCase {
     Config.storage = s"file:${storageFile.getAbsolutePath}"
 
     Config.api = "http://localhost:7000"
-    Scheduler.cluster.clear()
+    Scheduler.cluster.defaultEnsemble().clear()
 
     schedulerDriver = newSchedulerDriver
     Scheduler.registered(schedulerDriver, frameworkId(), master())

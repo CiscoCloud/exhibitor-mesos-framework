@@ -39,25 +39,6 @@ class ExhibitorTest extends MesosTestCase {
   }
 
   @Test
-  def matches() {
-    // cpu
-    server.config.cpus = 0.5
-    assertEquals(None, server.matches(offer(cpus = 0.5)))
-    assertEquals(Some("cpus 0.49 < 0.5"), server.matches(offer(cpus = 0.49)))
-    server.config.cpus = 0
-
-    // mem
-    server.config.mem = 100
-    assertEquals(None, server.matches(offer(mem = 100)))
-    assertEquals(Some("mem 99.0 < 100.0"), server.matches(offer(mem = 99)))
-    server.config.mem = 0
-
-    //port
-    assertEquals(None, server.matches(offer(ports = "100")))
-    assertEquals(Some("no suitable port"), server.matches(offer(ports = "")))
-  }
-
-  @Test
   def matchesHostname() {
     assertEquals(None, server.matches(offer(hostname = "master")))
     assertEquals(None, server.matches(offer(hostname = "slave0")))
@@ -148,9 +129,10 @@ class ExhibitorTest extends MesosTestCase {
     exhibitor.config.cpus = 1.5
     exhibitor.config.mem = 1024
 
-    val offer = this.offer(slaveId = "slave0", hostname = "host", ports = "1000")
+    val offer = this.offer(slaveId = "slave0", hostname = "host")
+    val reservation = Reservation(1.5, 1024, 4000, 4001, 4002, 4003)
 
-    val task = exhibitor.createTask(offer)
+    val task = exhibitor.createTask(offer, reservation)
     assertEquals("slave0", task.getSlaveId.getValue)
     assertNotNull(task.getExecutor)
 
@@ -169,11 +151,7 @@ class ExhibitorTest extends MesosTestCase {
     val portsResourceOpt = resources.get("ports")
     assertNotEquals(None, portsResourceOpt)
     val portsResource = portsResourceOpt.get
-    assertEquals(1, portsResource.getRanges.getRangeCount)
-
-    val range = portsResource.getRanges.getRangeList.toList.head
-    assertEquals(1000, range.getBegin)
-    assertEquals(1000, range.getEnd)
+    assertEquals(4, portsResource.getRanges.getRangeCount)
   }
 
   @Test
@@ -184,7 +162,7 @@ class ExhibitorTest extends MesosTestCase {
     val allServersRunning = Scheduler.acceptOffer(offer)
     assertEquals(allServersRunning, Some("all servers are running"))
 
-    Scheduler.cluster.addServer(exhibitor)
+    Scheduler.cluster.defaultEnsemble().addServer(exhibitor)
     exhibitor.state = Exhibitor.Stopped
     val accepted = Scheduler.acceptOffer(offer)
     assertEquals(None, accepted)
