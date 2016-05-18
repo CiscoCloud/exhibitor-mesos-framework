@@ -42,7 +42,7 @@ object Config {
   var ensembleModifyRetries: Int = 15
   var ensembleModifyBackoff: Long = 4000
 
-  var dockerImage: String = "elodina/exhibitor:0.3.0.0"
+  var dockerImage: String = "elodina/exhibitor-framework:0.2.0.0"
 
   def httpServerPort: Int = {
     val port = new URI(api).getPort
