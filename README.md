@@ -1,8 +1,6 @@
 Exhibitor Mesos Framework
 ======================
 
-This is still being developed actively and is not yet alpha. [Open issues here](https://github.com/CiscoCloud/exhibitor-mesos-framework/issues).
-
 [Prerequisites](#prerequisites)  
 * [Environment Configuration](#environment-configuration)  
 * [Scheduler Configuration](#scheduler-configuration)  
@@ -10,8 +8,9 @@ This is still being developed actively and is not yet alpha. [Open issues here](
 * [Quick start](#quick-start)  
 
 [Typical Operations](#typical-operations)  
-* [Running scheduler in Marathon](https://github.com/CiscoCloud/exhibitor-mesos-framework/tree/master/src/marathon)   
+* [Running scheduler in Marathon](https://github.com/elodina/exhibitor-mesos-framework/tree/master/src/marathon)   
 * [Changing the location of Zookeeper data](#changing-the-location-of-zookeeper-data)
+* [Shutting down framework](#shutting-down-framework)
 
 [Navigating the CLI](#navigating-the-cli)  
 * [Requesting help](#requesting-help)  
@@ -31,7 +30,7 @@ Prerequisites
 
 Clone and build the project
 
-    # git clone https://github.com/CiscoCloud/exhibitor-mesos-framework.git
+    # git clone https://github.com/elodina/exhibitor-mesos-framework.git
     # cd exhibitor-mesos-framework
     # ./gradlew jar
     
@@ -77,13 +76,18 @@ Usage: scheduler [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   -u <value> | --user <value>
         Mesos user. Required.
-  --ensemblemodifyretries <value>
+  --framework-name <value>
+        Mesos framework name. Defaults to exhibitor. Optional
+  --framework-timeout <value>
+        Mesos framework failover timeout. Allows to recover from failure before killing running tasks. Should be a parsable Scala Duration value. Defaults to 30 days. Optional
+  --storage <value>
+        Storage for cluster state. Examples: file:exhibitor-mesos.json; zk:master:2181/exhibitor-mesos. Required.
+  --ensemble-modify-retries <value>
         Number of retries to modify (add/remove server) ensemble. Defaults to 60. Optional.
-  --ensemblemodifybackoff <value>
+  --ensemble-modify-backoff <value>
         Backoff between retries to modify (add/remove server) ensemble in milliseconds. Defaults to 1000. Optional.
   -d <value> | --debug <value>
         Debug mode. Optional. Defaults to false.
-
 ```
 
 Run the scheduler
@@ -114,6 +118,8 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m
     exhibitor config:
     shared config overrides:
     cpu: 0.2
@@ -131,6 +137,8 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m
     exhibitor config:
     shared config overrides:
     cpu: 0.2
@@ -150,6 +158,8 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -163,17 +173,19 @@ cluster:
     port: auto
 ```
 
-Now lets start the server. The state should change from `Added` to `Stopped` meaning the task is waiting for resources to be offered.
+Now lets start the server. This call to CLI will block until the server is actually started but will wait no more than a configured timeout. Timeout can be passed via `--timeout` flag and defaults to `60s`. If a timeout of `0ms` is passed CLI won't wait for servers to start at all and will reply with "Scheduled servers ..." message.
 
 ```
-# ./exhibitor-mesos.sh start 0
+# ./exhibitor-mesos.sh start 0 --timeout 30s
 Started servers 0
 
 cluster:
   server:
     id: 0
-    state: Stopped
+    state: Running
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -197,6 +209,8 @@ cluster:
     state: Running
     endpoint: http://slave0:31000/exhibitor/v1/ui/index.html
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m, hostname:slave1
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -209,7 +223,14 @@ cluster:
     mem: 256.0
     sharedConfigChangeBackoff: 10000
     port: auto
+    exhibitor cluster view:
+          [slave0, latent, 0, F]
 ```
+
+(NOTE: with `exhibitor cluster view` section you can reason about underlying Exhibitor and Zookeeper ensemble.
+Since there is some synchronisation lag in Exhibitor when the node is added/removed, the view of the cluster may 
+be different from different nodes, that's why this section is shown under all nodes that are in the RUNNING state)
+
 
 By now you should have a single Exhibitor instance running. Here's how you stop it:
 
@@ -243,6 +264,8 @@ cluster:
     id: 0
     state: Added
     constraints: hostname=unique
+    failover: delay:1m, max-delay:10m, max-tries:2
+    stickiness: period: 10m
     exhibitor config:
       zkconfigzpath: /exhibitor/config
       zkconfigconnect: 192.168.3.1:2181
@@ -254,6 +277,15 @@ cluster:
     mem: 256.0
     sharedConfigChangeBackoff: 10000
     port: auto
+```
+
+Shutting down framework
+-----------------------
+
+While the scheduler has a shutdown hook it doesn't actually finish the framework. To shutdown the framework completely (e.g. unregister it in Mesos) you may shoot a `POST` to `/teardown` specifying the framework id to shutdown:
+
+```
+# curl -d frameworkId=20150807-094500-84125888-5050-14187-0005 -X POST http://master:5050/teardown
 ```
 
 Navigating the CLI
@@ -297,6 +329,8 @@ Usage: add <id> [options]
         Binding host:port for http/artifact server. Optional if EM_API env is set.
   --port <value>
         Port ranges to accept, when offer is issued. Optional
+  --docker <value>
+        Use Docker to run executor. Allows running multiple instances per host. Optional and defaults to false
 
 constraint examples:
   like:slave0    - value equals 'slave0'
@@ -320,6 +354,14 @@ Usage: config <id> [options]
 
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
+  --stickiness-period <value>
+        Stickiness period to preserve same node for Exhibitor server (5m, 10m, 1h).
+  --failover-delay <value>
+        Failover delay (10s, 5m, 3h).
+  --failover-max-delay <value>
+        Max failover delay. See failoverDelay.
+  --failover-max-tries <value>
+        Max failover tries. Default - none
   --configtype <value>
         Config type to use: s3 or zookeeper. Optional.
   --configcheckms <value>
@@ -440,3 +482,5 @@ Usage: remove <id> [options]
   -a <value> | --api <value>
         Binding host:port for http/artifact server. Optional if EM_API env is set.
 ```
+
+[Open issues here](https://github.com/elodina/exhibitor-mesos-framework/issues).
